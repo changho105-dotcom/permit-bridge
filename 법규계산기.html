@@ -339,6 +339,14 @@
     </div>
     <div id="fc-house-fields" style="display:none;">
       <div class="field">
+        <label for="fcHouseSubtype">세부 유형 (건축법 시행령 별표1 기준 — 층수 상한이 다름)</label>
+        <select id="fcHouseSubtype">
+          <option value="dagagu">다가구주택 (3개 층 이하)</option>
+          <option value="dasede">다세대주택·연립주택 (4개 층 이하)</option>
+          <option value="apt">아파트 (5개 층 이상)</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="fcUnitCount">세대 수</label>
         <input type="number" id="fcUnitCount" placeholder="예: 8" min="0" step="1">
       </div>
@@ -449,7 +457,8 @@
 
   <footer>
     본 계산 결과는 법규 검토를 돕기 위한 참고용 자료이며, 법적 효력이 없습니다.<br>
-    지구단위계획·개발행위허가 제한구역 등 별도 규제가 있을 수 있으니, 최종 확인은 반드시 관할 구청 및 건축사와 진행하세요.
+    지구단위계획·개발행위허가 제한구역 등 별도 규제가 있을 수 있으니, 최종 확인은 반드시 관할 구청 및 건축사와 진행하세요.<br>
+    <a href="#" id="feedbackBtn" style="color:inherit; text-decoration:underline;">불편사항·의견 보내기</a>
   </footer>
 
 </div>
@@ -4794,22 +4803,22 @@ const ZONE_ALLOWED_USES = {
   "제1종일반주거지역": ["danok","house","neighbor"],
   "제2종일반주거지역": ["danok","house","neighbor"],
   "제3종일반주거지역": ["danok","house","neighbor"],
-  "준주거지역": ["danok","house","neighbor","office","amuse"],
-  "중심상업지역": ["house","neighbor","office","amuse"],
-  "일반상업지역": ["house","neighbor","office","amuse"],
-  "근린상업지역": ["house","neighbor","office"],
-  "유통상업지역": ["neighbor","office"],
-  "전용공업지역": ["neighbor"],
-  "일반공업지역": ["house","neighbor"],
-  "준공업지역": ["house","neighbor","office"],
-  "보전녹지지역": ["danok"],
-  "생산녹지지역": ["danok","neighbor"],
+  "준주거지역": ["danok","house","neighbor","office"], // 2026-07-10: 위락시설(amuse)은 별표7상 준주거지역에서 전면 금지 확인되어 제외
+  "중심상업지역": ["house","neighbor","office","amuse"], // 별표8(2025.1.21) — 단독주택은 복합용도 아니면 법령상 금지라 danok 미포함
+  "일반상업지역": ["danok","house","neighbor","office","amuse"], // 별표9 — 단독주택은 조례로만 금지 가능(기본 허용)이라 danok 추가
+  "근린상업지역": ["danok","house","neighbor","office"], // 별표10 — 단독주택 제한 조항 자체가 없어 danok 추가, 위락시설은 원칙금지라 미포함
+  "유통상업지역": ["neighbor","office"], // 별표11 — 주택(단독+공동) 전면 금지, 예외 없음
+  "전용공업지역": ["neighbor"], // 별표12 — 주택은 기숙사만 조례허용(이 앱 용도구분에 없어 미반영), 단독·아파트류 불가
+  "일반공업지역": ["danok","neighbor"], // 별표13 — 단독주택은 조례허용, 공동주택은 기숙사만 가능해 house 제외
+  "준공업지역": ["danok","house","neighbor","office"], // 별표14 — 단독·공동주택 모두 조례로 금지 가능(=기본 허용)이라 danok 추가
+  "보전녹지지역": ["danok"], // 별표15 — 공동주택 완전 금지, 단독주택(다가구 제외)만 조례 허용
+  "생산녹지지역": ["danok","house","neighbor"], // 별표16 — 공동주택(아파트 제외)도 조례로 허용되어 house 추가
   "자연녹지지역": ["danok","house","neighbor"],
-  "보전관리지역": ["danok"],
-  "생산관리지역": ["danok","neighbor"],
+  "보전관리지역": ["danok"], // 별표18 — 공동주택 완전 금지
+  "생산관리지역": ["danok","house","neighbor"], // 별표19 — 공동주택(아파트 제외) 조례 허용되어 house 추가
   "계획관리지역": ["danok","house","neighbor","office"],
-  "농림지역": ["danok"],
-  "자연환경보전지역": ["danok"],
+  "농림지역": ["danok"], // 별표21 — 단독주택은 부지 1,000㎡ 미만만 가능(농업진흥지역·보전산지·초지 해당 시 다른 법 우선 적용)
+  "자연환경보전지역": [], // 별표22 — 단독주택도 농지법상 농어가주택만 가능(일반인 불가), 확정 가능한 일반 용도가 없어 비움
 };
 const USE_TYPE_LABELS = {
   danok: "단독주택 (다가구주택 제외)",
@@ -4934,9 +4943,13 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
 
 // 층수 제한(법적으로 확정된 경우만 표시) · 주차대수(건물 용도를 입력하면 함께 계산되는 통합 결과)
 // 조경면적은 전국 공통기준이 없고 지자체 조례 데이터도 미수집이라 기능 자체를 뺌(2026-07-10, 애매한 정보 금지 원칙)
-// 공동주택이 "아파트를 제외한" 형태로만 조례 위임 허용되는 용도지역 (국토계획법 시행령 별표17·21).
+// 공동주택이 "아파트를 제외한" 형태로만 조례 위임 허용되는 용도지역 (국토계획법 시행령 별표16·17·19·20).
 // 주택법상 아파트는 5개층 이상이므로, 이 지역들의 공동주택은 사실상 4개층 이하로 제한됨
-const HOUSE_APARTMENT_EXCLUDED_ZONES = ["자연녹지지역", "계획관리지역"];
+const HOUSE_APARTMENT_EXCLUDED_ZONES = ["자연녹지지역", "생산녹지지역", "생산관리지역", "계획관리지역"];
+
+// 전체 건축물(용도 무관)이 국토계획법 시행령상 원칙적으로 4개 층 이하로 제한되는 용도지역
+// (별표15 보전녹지·별표16 생산녹지·별표17 자연녹지·별표18 보전관리·별표19 생산관리·별표20 계획관리, 2026-07-10 원문 확인)
+const ZONE_WIDE_4FLOOR_ZONES = ["보전녹지지역", "생산녹지지역", "자연녹지지역", "보전관리지역", "생산관리지역", "계획관리지역"];
 
 function renderExtraResults(buildArea, floorArea){
   const floorsCardEl = document.getElementById('fcFloorsCard');
@@ -4945,6 +4958,8 @@ function renderExtraResults(buildArea, floorArea){
   const parkEl = document.getElementById('fcParking');
   const parkSubEl = document.getElementById('fcParkingSub');
   const useType = fcUseTypeSel.value;
+  const houseSubtype = document.getElementById('fcHouseSubtype').value;
+  const zoneWide4 = ZONE_WIDE_4FLOOR_ZONES.includes(zoneSel.value);
 
   if(!buildArea || !floorArea){
     floorsCardEl.style.display = 'none';
@@ -4955,12 +4970,26 @@ function renderExtraResults(buildArea, floorArea){
 
   // 층수는 확실히 확인된 법적 근거가 있을 때만 표시하고, 그 외에는 카드 자체를 숨김 — 건폐율/용적률에서
   // 산술적으로 나온 값을 "층수"인 것처럼 추정해서 보여주지 않음(확정 안 된 정보는 아예 표시 안 함 원칙)
-  if (useType === 'house' && HOUSE_APARTMENT_EXCLUDED_ZONES.includes(zoneSel.value)) {
-    // 국토계획법 시행령상 이 용도지역의 공동주택은 "아파트를 제외한" 형태로만 허용 → 주택법상 아파트=5개층
-    // 이상이므로 4개층 이하로 확정됨(추정 아님, 법령상 확정 사실)
+  if (useType === 'house' && houseSubtype === 'dagagu') {
+    // 건축법 시행령 별표1 — 다가구주택은 정의상 주택으로 쓰는 층수 3개 층 이하
+    floorsCardEl.style.display = 'block';
+    floorsEl.textContent = '3개 층 이하';
+    floorsSubEl.textContent = '법적 확정 — 다가구주택은 건축법 시행령 별표1상 3개 층 이하로 정의됨';
+  } else if (useType === 'house' && houseSubtype === 'dasede') {
+    // 건축법 시행령 별표1 — 다세대·연립주택은 정의상 4개 층 이하
     floorsCardEl.style.display = 'block';
     floorsEl.textContent = '4개 층 이하';
-    floorsSubEl.textContent = '법적 확정 — 이 용도지역의 공동주택은 "아파트 제외"만 허용(국토계획법 시행령)';
+    floorsSubEl.textContent = '법적 확정 — 다세대·연립주택은 건축법 시행령 별표1상 4개 층 이하로 정의됨';
+  } else if (useType === 'house' && houseSubtype === 'apt' && (HOUSE_APARTMENT_EXCLUDED_ZONES.includes(zoneSel.value) || zoneWide4)) {
+    // 이 용도지역은 공동주택 중 아파트를 법령상 제외 — 아파트 자체가 건축 불가
+    floorsCardEl.style.display = 'block';
+    floorsEl.textContent = '건축 불가';
+    floorsSubEl.textContent = '법적 확정 — 이 용도지역의 공동주택은 "아파트 제외"만 허용됩니다(국토계획법 시행령). 다세대·연립주택(4개 층 이하)을 선택하세요.';
+  } else if (zoneWide4) {
+    // 용도와 무관하게 이 용도지역 전체가 4개 층 이하로 제한됨 (국토계획법 시행령상 확정)
+    floorsCardEl.style.display = 'block';
+    floorsEl.textContent = '4개 층 이하';
+    floorsSubEl.textContent = '법적 확정 — ' + zoneSel.value + '은(는) 국토계획법 시행령상 건축물 전체가 원칙적으로 4개 층 이하로 제한됩니다(조례로 더 낮게 정할 수 있음)';
   } else {
     floorsCardEl.style.display = 'none';
   }
@@ -5114,6 +5143,19 @@ document.getElementById('consultBtn').addEventListener('click', () => {
   const sep = isIOS ? '&' : '?';
   const smsUrl = 'sms:' + CONSULT_PHONE + sep + 'body=' + encodeURIComponent(body);
 
+  window.location.href = smsUrl;
+});
+
+// 사용자 의견·불편사항을 관리자에게 문자로 전달 (별도 서버 없이 sms 링크로, 상담신청과 동일한 방식)
+document.getElementById('feedbackBtn').addEventListener('click', (e) => {
+  e.preventDefault();
+  const msg = prompt('불편하셨던 점이나 의견을 자유롭게 적어주세요. 문자 앱이 열리며 전송됩니다.');
+  if (!msg || !msg.trim()) return;
+
+  const body = '[인허가 브릿지 - 사용자 의견]\n' + msg.trim();
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const sep = isIOS ? '&' : '?';
+  const smsUrl = 'sms:' + CONSULT_PHONE + sep + 'body=' + encodeURIComponent(body);
   window.location.href = smsUrl;
 });
 </script>
