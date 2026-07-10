@@ -4580,12 +4580,17 @@ newSearchBtn.addEventListener('click', () => {
   newSearchBtn.style.display = 'none';
   document.getElementById('fcResults').style.display = 'none';
   document.getElementById('siteArea').value = '';
-  document.getElementById('fcUseType').value = '';
   fcHouseFields.style.display = 'none';
   lastMaxFloorArea = null;
   lastDetectedSigg = null;
   lastDetectedSido = null;
   multiZoneWeighted = null;
+  // 주소 조회로 잠겼던 지역/용도지역 선택을 다시 풀고 기본값으로 되돌림
+  regionSel.disabled = false;
+  zoneSel.disabled = false;
+  regionSel.value = 'seoul';
+  populateZones();
+  updateAllowedUseTypes();
   addrRowsBox.querySelector('.addrInputRow').focus();
 });
 
@@ -4681,15 +4686,18 @@ addrSearchBtn.addEventListener('click', async () => {
     newSearchBtn.style.display = 'block';
 
     // 지역/용도지역/대지면적 자동 반영
-    const regionValue = sidoToRegionValue(first.sido);
+    // 서울이 아니면 전부 GYEONGGI 참고표(21개 용도지역 전체 포함)로 zoneSel을 채움 — 예전엔 경기/인천만
+    // 처리하고 그 외 지역(부산·제주 등 223개 시·군·구)은 이 블록을 건너뛰어 zoneSel이 갱신 안 되던 버그가 있었음
     lastDetectedSigg = first.sigg;
     lastDetectedSido = first.sido;
-    if (regionValue) {
-      regionSel.value = regionValue;
-      populateZones();
-      const optionExists = Array.from(zoneSel.options).some(o => o.value === first.uname);
-      if (optionExists) zoneSel.value = first.uname;
-    }
+    regionSel.value = (first.sido === '서울특별시') ? 'seoul' : 'gyeonggi';
+    populateZones();
+    const optionExists = Array.from(zoneSel.options).some(o => o.value === first.uname);
+    if (optionExists) zoneSel.value = first.uname;
+    updateAllowedUseTypes();
+    // 지번(주소)으로 용도지역이 확정됐으므로, 실수로 다른 용도지역을 골라 잘못된 계산을 하지 않도록 잠금
+    regionSel.disabled = true;
+    zoneSel.disabled = true;
     if (totalArea > 0) {
       document.getElementById('siteArea').value = totalArea.toFixed(2);
     }
@@ -4723,7 +4731,7 @@ regionSel.addEventListener('change', populateZones);
 populateZones();
 
 // 지역·용도지역을 수동으로 바꾸면 필지별 가중평균 결과는 더 이상 유효하지 않으므로 초기화
-regionSel.addEventListener('change', () => { multiZoneWeighted = null; });
+regionSel.addEventListener('change', () => { multiZoneWeighted = null; updateAllowedUseTypes(); });
 zoneSel.addEventListener('change', () => { multiZoneWeighted = null; });
 
 // ---------- Tabs ----------
@@ -4781,6 +4789,60 @@ const fcHouseFields = document.getElementById('fc-house-fields');
 fcUseTypeSel.addEventListener('change', ()=>{
   fcHouseFields.style.display = (fcUseTypeSel.value === 'house') ? 'block' : 'none';
 });
+
+// 용도지역별 건축 가능 용도 (국토계획법 시행령 별표2~22, "용도지역 안에서 건축할 수 있는 건축물" 기준을
+// 이 앱의 5개 대분류로 단순화한 매핑). 조건부허용 항목도 포함시킨 것이며, 세부 층수·면적·용도 조건과
+// 지자체 조례에 의한 추가 제한은 미반영(일반 기준만) — 실제 인허가 시 반드시 관할 구청에 재확인 필요
+const ZONE_ALLOWED_USES = {
+  "제1종전용주거지역": ["danok"],
+  "제2종전용주거지역": ["danok","house"],
+  "제1종일반주거지역": ["danok","house","neighbor"],
+  "제2종일반주거지역": ["danok","house","neighbor"],
+  "제3종일반주거지역": ["danok","house","neighbor"],
+  "준주거지역": ["danok","house","neighbor","office","amuse"],
+  "중심상업지역": ["house","neighbor","office","amuse"],
+  "일반상업지역": ["house","neighbor","office","amuse"],
+  "근린상업지역": ["house","neighbor","office"],
+  "유통상업지역": ["neighbor","office"],
+  "전용공업지역": ["neighbor"],
+  "일반공업지역": ["house","neighbor"],
+  "준공업지역": ["house","neighbor","office"],
+  "보전녹지지역": ["danok"],
+  "생산녹지지역": ["danok","neighbor"],
+  "자연녹지지역": ["danok","house","neighbor"],
+  "보전관리지역": ["danok"],
+  "생산관리지역": ["danok","neighbor"],
+  "계획관리지역": ["danok","house","neighbor","office"],
+  "농림지역": ["danok"],
+  "자연환경보전지역": ["danok"],
+};
+const USE_TYPE_LABELS = {
+  danok: "단독주택 (다가구주택 제외)",
+  house: "다가구주택 · 공동주택 (다세대·연립 등)",
+  neighbor: "제1종·제2종 근린생활시설 / 숙박시설",
+  office: "업무시설·판매시설·문화집회시설 등 (오피스텔 제외)",
+  amuse: "위락시설",
+};
+
+// 현재 선택된 용도지역에서 건축 가능한 용도만 "건물 용도" 드롭다운에 남기고 나머지는 제거
+function updateAllowedUseTypes(){
+  const allowed = ZONE_ALLOWED_USES[zoneSel.value] || Object.keys(USE_TYPE_LABELS);
+  const prevValue = fcUseTypeSel.value;
+  fcUseTypeSel.innerHTML = '<option value="">선택 안 함</option>';
+  allowed.forEach(k=>{
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = USE_TYPE_LABELS[k];
+    fcUseTypeSel.appendChild(opt);
+  });
+  if (Array.from(fcUseTypeSel.options).some(o => o.value === prevValue)) {
+    fcUseTypeSel.value = prevValue;
+  } else {
+    fcUseTypeSel.value = '';
+    fcHouseFields.style.display = 'none';
+  }
+}
+zoneSel.addEventListener('change', updateAllowedUseTypes);
+updateAllowedUseTypes(); // 초기 로드시 기본 선택된 용도지역 기준으로 1회 적용
 
 // ---------- 건폐율/용적률 계산 ----------
 document.getElementById('calcFC').addEventListener('click', ()=>{
