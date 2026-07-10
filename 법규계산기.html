@@ -297,6 +297,7 @@
       </div>
 
       <div id="addrResult" style="display:none; margin-top:10px;"></div>
+      <button type="button" id="newSearchBtn" style="display:none; width:100%; margin-top:8px; padding:9px; border:1.5px dashed var(--ink); border-radius:8px; background:transparent; color:var(--ink-deep); font-size:13px; cursor:pointer;">🔄 다른 주소로 새로 검색하기</button>
     </div>
 
     <div style="display:flex; align-items:center; gap:10px; margin:20px 0 14px;">
@@ -4569,6 +4570,25 @@ async function lookupParcel(addr) {
   return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok };
 }
 
+const newSearchBtn = document.getElementById('newSearchBtn');
+newSearchBtn.addEventListener('click', () => {
+  // 필지 입력행을 1개(빈 값)로 되돌리고, 이전 검색 결과·계산 결과·상태를 전부 초기화 — 새로고침 없이 새 주소 검색 가능
+  addrRowsBox.innerHTML = '';
+  addrRowsBox.appendChild(makeAddrRow());
+  addrResultBox.style.display = 'none';
+  addrResultBox.innerHTML = '';
+  newSearchBtn.style.display = 'none';
+  document.getElementById('fcResults').style.display = 'none';
+  document.getElementById('siteArea').value = '';
+  document.getElementById('fcUseType').value = '';
+  fcHouseFields.style.display = 'none';
+  lastMaxFloorArea = null;
+  lastDetectedSigg = null;
+  lastDetectedSido = null;
+  multiZoneWeighted = null;
+  addrRowsBox.querySelector('.addrInputRow').focus();
+});
+
 addrSearchBtn.addEventListener('click', async () => {
   const addrInputs = Array.from(document.querySelectorAll('.addrInputRow'));
   const addrs = addrInputs.map(el => el.value.trim()).filter(v => v);
@@ -4595,6 +4615,7 @@ addrSearchBtn.addEventListener('click', async () => {
     if (okResults.length === 0) {
       addrResultBox.style.display = 'block';
       addrResultBox.innerHTML = '<div class="note-box warn">' + failResults.map(r => (addrs.length > 1 ? '<b>' + r.addr + '</b>: ' : '') + r.error).join('<br>') + '</div>';
+      newSearchBtn.style.display = 'block';
       return;
     }
 
@@ -4657,6 +4678,7 @@ addrSearchBtn.addEventListener('click', async () => {
 
     addrResultBox.style.display = 'block';
     addrResultBox.innerHTML = html;
+    newSearchBtn.style.display = 'block';
 
     // 지역/용도지역/대지면적 자동 반영
     const regionValue = sidoToRegionValue(first.sido);
