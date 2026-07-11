@@ -5308,6 +5308,10 @@ const OVERLAY_RISK_KEYWORDS = [
 // (참고, 21개 목록 외 보너스 발견) 도시철도법 고유 항목·전기사업법(전주·전선로)·도시가스사업법은
 // 아직 실제 사례로 명칭 미확인.
 
+// 지역지구 감지 결과(아래에서든, 위 목록에서든)에는 항상 이 캐비어트를 붙여서 21개 법령 중 16개만
+// 확인한다는 사실을 명시 — "이 목록에 없음 = 완전히 안전"으로 오인하지 않도록 함
+const OVERLAY_COVERAGE_NOTE = 'ℹ️ 이 검사는 건축법 시행령 제10조 관련 법령 21개 중 16개 항목을 기준으로 합니다. <b>택지개발지구·고도지구·전통사찰보존구역</b> 지정 여부와 <b>부설주차장·교통영향평가</b> 관련 절차는 이 앱에서 확인되지 않으니 관할 시·군·구청에 별도로 확인하세요.';
+
 // 반환값: { risks: [...], checked: true/false } — checked=false(조회 자체가 실패)와 risks=[](정상 조회했는데
 // 해당사항 없음)을 구분해야 함. 조회 실패를 "위험 없음"으로 오인해 확정 계산을 보여주면 안 되기 때문(애매한
 // 정보 금지 원칙) — 대신 조회 실패 시엔 기존처럼 국토계획법 기준 계산은 그대로 보여주되 "지역지구 중복
@@ -5475,6 +5479,9 @@ addrSearchBtn.addEventListener('click', async () => {
       html += '<div class="note-box warn">🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b> (건폐율/용적률 일반 계산 대신 이 목록을 확인하세요):' +
         '<div style="margin-top:8px;">' + checklistHtml + '</div>' +
         '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div></div>';
+    }
+    if (lastOverlayRisks && lastOverlayRisks.checked) {
+      html += '<div class="note-box" style="font-size:12.5px;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     }
 
     addrResultBox.style.display = 'block';
@@ -5679,7 +5686,8 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     ).join('');
     noteEl.innerHTML = '🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b>:' +
       '<div style="margin-top:8px;">' + overlayChecklistHtml + '</div>' +
-      '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div>';
+      '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div>' +
+      '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     lastMaxFloorArea = null;
     trustBadgeEl.style.background = 'var(--warn-bg)';
     trustBadgeEl.style.color = 'var(--warn)';
@@ -5746,6 +5754,11 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     trustBadgeEl.style.background = 'var(--warn-bg)';
     trustBadgeEl.style.color = 'var(--warn)';
     trustBadgeEl.innerHTML = '⛔ 미확정 지역 · ' + (lastDetectedSigg || '지자체 미확인') + ' — 결과 제공 안 함';
+  }
+  // 위 분기가 무엇이었든, 지역지구 조회 자체는 성공(checked)했고 위험이 감지 안 된 경우에도 커버리지
+  // 한계를 알려야 함 (risks.length>0 분기는 이미 자체 안내문 안에 같은 문구를 포함하고 있어 중복 방지)
+  if (lastOverlayRisks && lastOverlayRisks.checked && lastOverlayRisks.risks.length === 0) {
+    noteEl.innerHTML += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
   }
 
   // 건축조례(조경·일조권·대지안의공지) 조회 키 — 현재 서울·경기 32개 시군만 데이터 있음(전국 확장 진행 중)
