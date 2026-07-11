@@ -5482,6 +5482,9 @@ addrSearchBtn.addEventListener('click', async () => {
       });
     });
     lastOverlayRisks = { risks: combinedRisks, checked: allChecked };
+    if (combinedRisks.length > 0 && typeof gtag === 'function') {
+      gtag('event', 'overlay_risk_detected', { risk_count: combinedRisks.length, risk_labels: combinedRisks.map(r => r.label).join(',') });
+    }
 
     // 필지마다 용도지역이 다르면 국토계획법 제84조에 따라 면적 비율로 건폐율·용적률을 가중평균 (하나의 대지로 합쳐서 건축하는 경우)
     multiZoneWeighted = null;
@@ -5829,6 +5832,9 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     trustBadgeEl.style.background = 'var(--warn-bg)';
     trustBadgeEl.style.color = 'var(--warn)';
     trustBadgeEl.innerHTML = '⛔ 미확정 지역 · ' + (lastDetectedSigg || '지자체 미확인') + ' — 결과 제공 안 함';
+    if (typeof gtag === 'function') {
+      gtag('event', 'unconfirmed_region_shown', { sigg: lastDetectedSigg || '(미확인)' });
+    }
   }
   // 위 분기가 무엇이었든, 지역지구 조회 자체는 성공(checked)했고 위험이 감지 안 된 경우에도 커버리지
   // 한계를 알려야 함 (risks.length>0 분기는 이미 자체 안내문 안에 같은 문구를 포함하고 있어 중복 방지)
@@ -6133,6 +6139,9 @@ document.getElementById('consultBtn').addEventListener('click', () => {
   const sep = isIOS ? '&' : '?';
   const smsUrl = 'sms:' + CONSULT_PHONE + sep + 'body=' + encodeURIComponent(body);
 
+  if (typeof gtag === 'function') {
+    gtag('event', 'consult_request', { needs_civil_engineer: !!needsCivilEngineer, zone: zone });
+  }
   window.location.href = smsUrl;
 });
 
