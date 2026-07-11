@@ -5077,6 +5077,23 @@ const GYEONGGI = {
 const VWORLD_KEY = "4D1732B7-C9D9-3D0B-8651-486A30737F98";
 const VWORLD_DOMAIN = "changho105-dotcom.github.io"; // 신청 시 등록한 서비스URL의 호스트값 — 실제 배포 도메인과 반드시 일치해야 함 (2026-07-10 GitHub Pages 배포하며 github.com→실제 도메인으로 수정)
 
+// ---------- 조회내역 구글시트 자동 기록 ----------
+// Kevin이 만든 Google Apps Script 웹앱(2026-07-11 배포) — 본인 시트에만 append하는 doPost() 엔드포인트
+const SHEET_LOG_URL = "https://script.google.com/macros/s/AKfycbwfcIodZtOyBWOisucWz1A6VOfHOQU93hUESGT058DTNsnUBs4hEf90Ml-ZW300WzAQ/exec";
+function logToSheet(payload) {
+  // Content-Type을 text/plain으로 보내야 브라우저가 OPTIONS 프리플라이트를 안 보냄(Apps Script 웹앱이
+  // 프리플라이트에 응답 못해서 실패하는 흔한 문제 회피). mode:no-cors라 응답은 못 읽지만 전송 자체는 됨.
+  // 실패해도 조용히 무시 — 로깅 실패가 실제 계산 기능 사용을 막으면 안 됨(부가 기능이라 애매한 정보 금지 원칙과 무관)
+  try {
+    fetch(SHEET_LOG_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 let jsonpCounter = 0;
 function vworldJsonp(url) {
   return new Promise((resolve, reject) => {
@@ -5775,6 +5792,16 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     : null;
   renderExtraResults(currentBuildArea, currentFloorArea, site, buildingOrdinanceKey);
   resultsBox.style.display = 'block';
+
+  logToSheet({
+    addr: Array.from(document.querySelectorAll('.addrInputRow')).map(el => el.value.trim()).filter(v => v).join(', '),
+    zone: zoneName,
+    area: site,
+    buildArea: currentBuildArea,
+    floorArea: currentFloorArea,
+    overlayRisk: (lastOverlayRisks && lastOverlayRisks.risks.length > 0) ? lastOverlayRisks.risks.map(r => r.label).join(', ')
+      : (lastOverlayRisks && lastOverlayRisks.checked) ? '없음' : '미확인',
+  });
 });
 
 // 층수 제한(법적으로 확정된 경우만 표시) · 주차대수(건물 용도를 입력하면 함께 계산되는 통합 결과)
