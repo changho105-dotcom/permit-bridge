@@ -543,6 +543,21 @@ const CITY_BUILDING_ORDINANCE = {
     },
     setbackBasis: '서울특별시 건축 조례 제30조·별표4(2017.9.21 개정)',
   },
+  "수원시": {
+    // 제31조(대지 안의 조경) — 중심상업지역은 규모 무관 일괄 5%로 완화되어 일반지역과 다른 브래킷 사용
+    landscape: [
+      { minFloorArea: 5000, pct: 18 },
+      { minFloorArea: 2000, pct: 15 },
+      { minFloorArea: 1000, pct: 10 },
+      { minFloorArea: 0, pct: 5 },
+    ],
+    landscapeByZone: {
+      '중심상업지역': [ { minFloorArea: 0, pct: 5 } ], // 규모 무관 일괄 5%
+    },
+    landscapeBasis: '수원시 건축 조례 제31조',
+    // 일조권(제41조 추정, 9m 기준으로 국가기준보다 강화)·대지안의공지(제37조·별표3)는 아직 원문 미확정이라
+    // 반영 보류 — sunlight/setback 키를 넣지 않으면 해당 카드/안내가 자동으로 숨겨짐(추정 금지 원칙)
+  },
 };
 
 // ---------- 시·군·구별 확정 조례 데이터 (elis.go.kr 자치법규정보시스템 원문 확인) ----------
@@ -5109,7 +5124,9 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   }
 
   // 건축조례(조경·대지안의공지·일조권) 조회 키 — 현재는 서울시만 데이터 있음, 다른 도시는 추가되는 대로 여기 매핑 추가
-  const buildingOrdinanceKey = (region === 'seoul') ? '서울특별시' : null;
+  const buildingOrdinanceKey = (region === 'seoul') ? '서울특별시'
+    : (lastDetectedSigg && CITY_BUILDING_ORDINANCE[lastDetectedSigg]) ? lastDetectedSigg
+    : null;
   renderExtraResults(currentBuildArea, currentFloorArea, site, buildingOrdinanceKey);
   resultsBox.style.display = 'block';
 });
@@ -5150,10 +5167,13 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey){
     return;
   }
 
-  // 조경면적 — 건축조례에 확정 데이터가 있는 도시(현재 서울)만 표시. 연면적 구간에 따라 대지면적 대비 비율 적용
+  // 조경면적 — 건축조례에 확정 데이터가 있는 도시만 표시. 연면적 구간에 따라 대지면적 대비 비율 적용.
+  // 일부 도시(예: 수원시)는 특정 용도지역(중심상업지역 등)에 규모 무관 별도 비율을 적용하므로 landscapeByZone 우선 확인
   if (ordinance && ordinance.landscape && site) {
-    const bracket = ordinance.landscape.find(b => floorArea >= b.minFloorArea);
-    const pct = bracket ? bracket.pct : ordinance.landscape[ordinance.landscape.length - 1].pct;
+    const brackets = (ordinance.landscapeByZone && ordinance.landscapeByZone[zoneSel.value])
+      ? ordinance.landscapeByZone[zoneSel.value] : ordinance.landscape;
+    const bracket = brackets.find(b => floorArea >= b.minFloorArea);
+    const pct = bracket ? bracket.pct : brackets[brackets.length - 1].pct;
     const landscapeArea = site * pct / 100;
     landscapeCardEl.style.display = 'block';
     landscapeEl.textContent = landscapeArea.toLocaleString(undefined,{maximumFractionDigits:2}) + ' ㎡';
