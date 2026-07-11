@@ -5293,52 +5293,59 @@ async function lookupParcel(addr) {
 // 이 앱이 확정 계산을 못 줌 — "전문가와 상담하세요" 같은 회피성 안내 대신, 실제로 동의·허가를 받아야 하는
 // 소관기관을 구체적으로 알려줌(2026-07-11 Kevin 피드백: "군부대 동의, 문화재청 동의처럼 기관마다 다르고
 // 실제 인허가 단계에서 오래 걸리는 게 핵심 정보다").
+// blocking:true = 재량허가·개별고시·자격제한형이라 전국 공통 확정수치가 없어 국토계획법 표준 건폐율/용적률을
+// 보여줄 수 없는 경우(전문가 상담으로 전환). blocking:false = 특정 용도(공장·가축시설 등)를 지을 때만,
+// 매매 시에만, 또는 높이제한 등 부가조건만 걸리는 경우 — 표준 계산은 그대로 보여주고 참고사항으로만 안내.
+// 2026-07-11 Kevin 피드백("설계사 수준" 요구)으로 분류 도입. 근거: backups/별표연구노트/*.md의 기존
+// 법령 원문 조사(개발제한구역·농업진흥구역·보전산지·자연공원·상수원보호구역·문화재보호구역·군사시설보호구역·
+// 접도구역·하천구역은 전부 "재량허가/자격제한형 → 전문가상담" 결론 이미 확정) + 이번에 수도권정비계획법
+// 제7조·지구단위계획 실무자료 재검색으로 과밀억제권역·지구단위계획구역이 일반 주택에는 무관함을 교차검증.
 const OVERLAY_RISK_KEYWORDS = [
-  { kw: '개발제한구역', label: '개발제한구역', authority: '관할 시장·군수·구청장 (개발제한구역법령상 행위허가)' },
-  { kw: '집단취락지구', label: '집단취락지구', authority: '관할 시장·군수·구청장 (개발제한구역법령 특례 허가)' },
-  { kw: '농업진흥', label: '농업진흥구역·농업보호구역', authority: '관할 시장·군수·구청장 (농지법상 농지전용허가)' },
-  { kw: '보전산지', label: '보전산지(임업용·공익용)', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가)' },
-  { kw: '자연공원', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)' },
-  { kw: '공원자연', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)' },
-  { kw: '공원마을', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)' },
-  { kw: '상수원보호구역', label: '상수원보호구역', authority: '관할 시장·군수·구청장 (수도법상 행위허가)' },
-  { kw: '문화재보호구역', label: '문화재보호구역', authority: '국가유산청(문화재청)·지자체 (현상변경허가·영향진단)' },
-  { kw: '역사문화환경', label: '역사문화환경 보존지역', authority: '국가유산청(문화재청)·지자체 (현상변경허가·영향진단)' },
-  { kw: '군사시설보호구역', label: '군사시설보호구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
-  { kw: '비행안전', label: '비행안전구역', authority: '관할부대장 (군사기지법상 협의·허가, 높이제한 등)' },
-  { kw: '통제보호구역', label: '군사 통제보호구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
-  { kw: '제한보호구역', label: '군사 제한보호구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
-  { kw: '접도구역', label: '접도구역', authority: '도로관리청 (도로법상 행위허가)' },
-  { kw: '하천구역', label: '하천구역', authority: '하천관리청 (하천법상 점용허가)' },
-  { kw: '토지거래', label: '토지거래허가구역', authority: '관할 시장·군수·구청장 (부동산 거래신고법상 토지거래계약허가 — 건축이 아니라 매매·취득 시 허가 필요)' },
-  { kw: '공장설립', label: '공장설립승인지역', authority: '관할 시장·군수·구청장 (산업집적법상 공장설립승인)' },
-  { kw: '배출시설설치제한', label: '배출시설설치제한지역', authority: '관할 시장·군수·구청장 (대기·수질 배출시설 설치 제한)' },
-  { kw: '대공방어협조구역', label: '대공방어협조구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
-  { kw: '상대보호구역', label: '교육환경보호구역(상대보호구역)', authority: '관할 교육청 (교육환경 보호에 관한 법률상 교육환경평가·허가)' },
-  { kw: '절대보호구역', label: '교육환경보호구역(절대보호구역)', authority: '관할 교육청 (교육환경 보호에 관한 법률상 교육환경평가·허가, 상대보호구역보다 학교에 더 가까워 제한이 강함)' },
-  { kw: '철도', label: '철도 관련시설', authority: '국가철도공단·한국철도공사 또는 관할 철도관리청 (철도안전법상 철도보호지구 협의)' },
-  { kw: '지구단위계획구역', label: '지구단위계획구역', authority: '관할 시장·군수·구청장 (해당 구역 지구단위계획을 확인해야 함 — 일반 용도지역 기준과 다를 수 있음)' },
-  { kw: '중요시설물보호지구', label: '중요시설물보호지구', authority: '관할 시장·군수·구청장·해당 시설 관리기관 (국토계획법 시행령 제76조 보호지구, 예: 공항이면 한국공항공사·인천국제공항공사)' },
-  { kw: '표면구역', label: '공항 장애물제한표면구역(수평·원추·전이·진입표면 등)', authority: '한국공항공사·인천국제공항공사 (공항시설법상 장애물 높이제한 협의)' },
-  { kw: '가축사육제한', label: '가축사육제한구역', authority: '관할 시장·군수·구청장 (가축분뇨의 관리 및 이용에 관한 법률)' },
-  { kw: '과밀억제권역', label: '과밀억제권역', authority: '관할 시·도지사 (수도권정비계획법상 인구집중유발시설·대규모개발사업 등 행위제한)' },
-  { kw: '성장관리권역', label: '성장관리권역', authority: '관할 시·도지사 (수도권정비계획법상 행위제한, 과밀억제권역보다는 완화됨)' },
-  { kw: '자연보전권역', label: '자연보전권역', authority: '관할 시·도지사 (수도권정비계획법상 행위제한, 3개 권역 중 규제가 가장 강함)' },
-  { kw: '준보전산지', label: '준보전산지', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가 — 보전산지보다 규제는 약하지만 여전히 허가 필요)' },
-  { kw: '보전산지', label: '보전산지(임업용·공익용)', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가)' },
-  { kw: '수질보전특별대책지역', label: '수질보전특별대책지역', authority: '환경부(유역환경청)·관할 지자체 (환경정책기본법상 특별대책지역 — 건축·배출시설 설치 제한)' },
-  { kw: '폐기물매립시설', label: '폐기물매립시설 설치제한지역', authority: '환경부(유역환경청)·관할 지자체 (폐기물관리법 관련 설치제한)' },
-  { kw: '성장관리계획구역', label: '성장관리계획구역', authority: '관할 시장·군수·구청장 (국토계획법상 성장관리계획에 따른 개발행위 기준 적용 — 위 성장관리권역과 다른 제도)' },
-  { kw: '도로구역', label: '도로구역', authority: '도로관리청 (도로법상 도로구역 내 행위제한 — 위 접도구역과 별개)' },
+  { kw: '개발제한구역', label: '개발제한구역', authority: '관할 시장·군수·구청장 (개발제한구역법령상 행위허가)', blocking: true },
+  { kw: '집단취락지구', label: '집단취락지구', authority: '관할 시장·군수·구청장 (개발제한구역법령 특례 허가)', blocking: true },
+  { kw: '농업진흥', label: '농업진흥구역·농업보호구역', authority: '관할 시장·군수·구청장 (농지법상 농지전용허가)', blocking: true },
+  { kw: '보전산지', label: '보전산지(임업용·공익용)', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가)', blocking: true },
+  { kw: '자연공원', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)', blocking: true },
+  { kw: '공원자연', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)', blocking: true },
+  { kw: '공원마을', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)', blocking: true },
+  { kw: '상수원보호구역', label: '상수원보호구역', authority: '관할 시장·군수·구청장 (수도법상 행위허가)', blocking: true },
+  { kw: '문화재보호구역', label: '문화재보호구역', authority: '국가유산청(문화재청)·지자체 (현상변경허가·영향진단 — 문화유산별 개별고시 기준이라 전국 공통수치 없음)', blocking: true },
+  { kw: '역사문화환경', label: '역사문화환경 보존지역', authority: '국가유산청(문화재청)·지자체 (현상변경허가·영향진단 — 문화유산별 개별고시 기준이라 전국 공통수치 없음)', blocking: true },
+  { kw: '군사시설보호구역', label: '군사시설보호구역', authority: '관할부대장 (군사기지법상 협의·허가)', blocking: true },
+  { kw: '비행안전', label: '비행안전구역', authority: '관할부대장 (군사기지법상 협의·허가, 대부분 높이제한만 적용되고 건축 자체는 가능)', blocking: false },
+  { kw: '통제보호구역', label: '군사 통제보호구역', authority: '관할부대장 (군사기지법상 협의·허가, 건축물 신축 원칙 금지)', blocking: true },
+  { kw: '제한보호구역', label: '군사 제한보호구역', authority: '관할부대장 (군사기지법상 협의·허가 — 통제보호구역보다 완화되나 정확한 허용범위는 개별 확인 필요)', blocking: true },
+  { kw: '접도구역', label: '접도구역', authority: '도로관리청 (도로법상 원칙 건축금지 구간, 경미한 행위만 예외)', blocking: true },
+  { kw: '하천구역', label: '하천구역', authority: '하천관리청 (하천법상 점용허가, 원칙 건축금지)', blocking: true },
+  { kw: '토지거래', label: '토지거래허가구역', authority: '관할 시장·군수·구청장 (부동산 거래신고법상 토지거래계약허가 — 건축이 아니라 매매·취득 시 허가 필요)', blocking: false },
+  { kw: '공장설립', label: '공장설립승인지역', authority: '관할 시장·군수·구청장 (산업집적법상 공장설립승인 — 공장 신축 시에만 해당)', blocking: false },
+  { kw: '배출시설설치제한', label: '배출시설설치제한지역', authority: '관할 시장·군수·구청장 (대기·수질 배출시설 설치 시에만 해당)', blocking: false },
+  { kw: '대공방어협조구역', label: '대공방어협조구역', authority: '관할부대장 (군사기지법상 협의·허가, 대부분 높이제한만 적용)', blocking: false },
+  { kw: '상대보호구역', label: '교육환경보호구역(상대보호구역)', authority: '관할 교육청 (교육환경 보호에 관한 법률상 교육환경평가·허가 — 유해시설 용도에만 해당)', blocking: false },
+  { kw: '절대보호구역', label: '교육환경보호구역(절대보호구역)', authority: '관할 교육청 (교육환경 보호에 관한 법률상 교육환경평가·허가, 상대보호구역보다 학교에 더 가까워 제한이 강함 — 유해시설 용도에만 해당)', blocking: false },
+  { kw: '철도', label: '철도 관련시설', authority: '국가철도공단·한국철도공사 또는 관할 철도관리청 (철도안전법상 철도보호지구 협의, 대부분 구조·높이 제한만 적용)', blocking: false },
+  { kw: '지구단위계획구역', label: '지구단위계획구역', authority: '관할 시장·군수·구청장 (지구단위계획이 실제 수립됐는지 확인 필요 — 미수립 시 기존 용도지역 기준 그대로 적용, 수립 시 대부분 완화 방향)', blocking: false },
+  { kw: '중요시설물보호지구', label: '중요시설물보호지구', authority: '관할 시장·군수·구청장·해당 시설 관리기관 (국토계획법 시행령 제76조 보호지구, 예: 공항이면 한국공항공사·인천국제공항공사)', blocking: false },
+  { kw: '표면구역', label: '공항 장애물제한표면구역(수평·원추·전이·진입표면 등)', authority: '한국공항공사·인천국제공항공사 (공항시설법상 장애물 높이제한 협의, 건축 자체는 가능)', blocking: false },
+  { kw: '가축사육제한', label: '가축사육제한구역', authority: '관할 시장·군수·구청장 (가축분뇨의 관리 및 이용에 관한 법률 — 가축사육시설에만 해당)', blocking: false },
+  { kw: '과밀억제권역', label: '과밀억제권역', authority: '관할 시·도지사 (수도권정비계획법 제7조상 학교·공공청사·연수시설·인구집중유발시설·공업지역 지정만 제한, 일반 주택·근생은 무관)', blocking: false },
+  { kw: '성장관리권역', label: '성장관리권역', authority: '관할 시·도지사 (수도권정비계획법상 행위제한, 과밀억제권역과 동일하게 특정 대규모시설만 대상)', blocking: false },
+  { kw: '자연보전권역', label: '자연보전권역', authority: '관할 시·도지사 (수도권정비계획법상 행위제한, 3개 권역 중 규제가 가장 강하나 일반 주택·근생은 대체로 무관)', blocking: false },
+  { kw: '준보전산지', label: '준보전산지', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가 — 보전산지보다 규제가 약해 통상 허가가 남)', blocking: false },
+  { kw: '보전산지', label: '보전산지(임업용·공익용)', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가)', blocking: true },
+  { kw: '수질보전특별대책지역', label: '수질보전특별대책지역', authority: '환경부(유역환경청)·관할 지자체 (환경정책기본법상 특별대책지역 — 특정 배출시설 등에만 해당)', blocking: false },
+  { kw: '폐기물매립시설', label: '폐기물매립시설 설치제한지역', authority: '환경부(유역환경청)·관할 지자체 (폐기물관리법 관련 설치제한 — 폐기물시설에만 해당)', blocking: false },
+  { kw: '성장관리계획구역', label: '성장관리계획구역', authority: '관할 시장·군수·구청장 (국토계획법상 성장관리계획에 따른 개발행위 기준 적용 — 계획 내용 확인 필요, 위 성장관리권역과 다른 제도)', blocking: false },
+  { kw: '도로구역', label: '도로구역', authority: '도로관리청 (도로법상 도로구역 내 원칙 건축금지 — 위 접도구역과 별개)', blocking: true },
   // 2026-07-11 건축법 시행령 제10조 21개 법률 전수대조로 신규 발견·실제 주소 API 테스트로 확정
-  { kw: '산림보호구역', label: '산림보호구역', authority: '관할 지방산림청·시장·군수·구청장 (산림보호법상 산림보호구역 내 행위제한)' },
-  { kw: '산림유전자원보호구역', label: '산림유전자원보호구역', authority: '관할 지방산림청 (산림보호법상 행위제한, 산림보호구역 중에서도 규제가 강한 유형)' },
-  { kw: '수원함양보호구역', label: '수원함양보호구역', authority: '관할 지방산림청 (산림자원의 조성 및 관리에 관한 법률상 행위제한)' },
-  { kw: '생태계보전지구', label: '생태·경관보전지역(생태계보전지구)', authority: '환경부(유역환경청) (자연환경보전법상 행위제한)' },
-  { kw: '경관보전지구', label: '생태·경관보전지역(경관보전지구)', authority: '환경부(유역환경청) (자연환경보전법상 행위제한)' },
-  { kw: '문화유산보호구역', label: '국가지정문화유산 보호구역(사적·천연기념물·명승 등)', authority: '국가유산청 (문화유산의 보존 및 활용에 관한 법률·자연유산의 보존 및 활용에 관한 법률상 현상변경허가)' },
-  { kw: '국가지정문화유산구역', label: '국가지정문화유산 보호구역(사적·천연기념물·명승 등)', authority: '국가유산청 (문화유산의 보존 및 활용에 관한 법률·자연유산의 보존 및 활용에 관한 법률상 현상변경허가)' },
-  { kw: '도시자연공원구역', label: '도시자연공원구역', authority: '관할 시장·군수·구청장 (도시공원 및 녹지 등에 관한 법률상 행위제한)' },
+  { kw: '산림보호구역', label: '산림보호구역', authority: '관할 지방산림청·시장·군수·구청장 (산림보호법상 산림보호구역 내 행위제한)', blocking: true },
+  { kw: '산림유전자원보호구역', label: '산림유전자원보호구역', authority: '관할 지방산림청 (산림보호법상 행위제한, 산림보호구역 중에서도 규제가 강한 유형)', blocking: true },
+  { kw: '수원함양보호구역', label: '수원함양보호구역', authority: '관할 지방산림청 (산림자원의 조성 및 관리에 관한 법률상 행위제한)', blocking: true },
+  { kw: '생태계보전지구', label: '생태·경관보전지역(생태계보전지구)', authority: '환경부(유역환경청) (자연환경보전법상 행위제한)', blocking: true },
+  { kw: '경관보전지구', label: '생태·경관보전지역(경관보전지구)', authority: '환경부(유역환경청) (자연환경보전법상 행위제한)', blocking: true },
+  { kw: '문화유산보호구역', label: '국가지정문화유산 보호구역(사적·천연기념물·명승 등)', authority: '국가유산청 (문화유산의 보존 및 활용에 관한 법률·자연유산의 보존 및 활용에 관한 법률상 현상변경허가 — 문화재보호구역과 동일하게 개별고시 기준)', blocking: true },
+  { kw: '국가지정문화유산구역', label: '국가지정문화유산 보호구역(사적·천연기념물·명승 등)', authority: '국가유산청 (문화유산의 보존 및 활용에 관한 법률·자연유산의 보존 및 활용에 관한 법률상 현상변경허가 — 문화재보호구역과 동일하게 개별고시 기준)', blocking: true },
+  { kw: '도시자연공원구역', label: '도시자연공원구역', authority: '관할 시장·군수·구청장 (도시공원 및 녹지 등에 관한 법률상 행위제한, 공원구역 내 건축 원칙 제한)', blocking: true },
 ];
 // 2026-07-11 강남역 부지(역삼동 858) 테스트로 대공방어협조구역·상대보호구역·철도·지구단위계획구역,
 // 김포공항 인근(강서구 공항동 51-83) 테스트로 중요시설물보호지구·표면구역(공항시설법)·가축사육제한구역,
@@ -5385,7 +5392,7 @@ async function lookupOverlayRisks(pnu, addr){
         if (name.includes(entry.kw)) {
           if (!seen.has(entry.label)) {
             seen.add(entry.label);
-            found.push({ label: entry.label, raw: name, authority: entry.authority });
+            found.push({ label: entry.label, raw: name, authority: entry.authority, blocking: entry.blocking });
           }
           break;
         }
@@ -5743,15 +5750,21 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   const trustBadgeEl = document.getElementById('trustBadge');
   let currentBuildArea = null, currentFloorArea = null;
 
-  if (lastOverlayRisks && lastOverlayRisks.risks.length > 0) {
-    // 개발제한구역 등 "다른 법령 지역·지구"가 감지되면 국토계획법 기준 건폐율/용적률 계산 자체가
+  // 2026-07-11: risks를 "진짜 차단"(blocking:true)과 "참고사항"(blocking:false)으로 분리 —
+  // 참고사항만 있으면(예: 과밀억제권역, 지구단위계획구역) 계산을 막지 않고 정상 표시 + 아래에 안내만 덧붙임
+  const allRisks = (lastOverlayRisks && lastOverlayRisks.risks) || [];
+  const blockingRisks = allRisks.filter(r => r.blocking);
+  const advisoryRisks = allRisks.filter(r => !r.blocking);
+
+  if (blockingRisks.length > 0) {
+    // 개발제한구역 등 재량허가/개별고시형 지역·지구가 감지되면 국토계획법 기준 건폐율/용적률 계산 자체가
     // 무의미해짐(그 법이 우선 적용) — 숫자를 보여주지 않고 감지된 지역·지구를 그대로 안내
     buildAreaEl.textContent = '—';
     buildRateEl.textContent = '일반 계산 적용 불가';
     floorAreaEl.textContent = '—';
     floorRateEl.textContent = '일반 계산 적용 불가';
     noteEl.className = 'note-box warn';
-    const overlayChecklistHtml = lastOverlayRisks.risks.map(r =>
+    const overlayChecklistHtml = blockingRisks.map(r =>
       '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b><br><span style="font-size:12.5px; color:var(--text-muted);">동의·허가 필요: ' + r.authority + '</span></div>'
     ).join('');
     noteEl.innerHTML = '🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b>:' +
@@ -5828,10 +5841,17 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
       gtag('event', 'unconfirmed_region_shown', { sigg: lastDetectedSigg || '(미확인)' });
     }
   }
-  // 위 분기가 무엇이었든, 지역지구 조회 자체는 성공(checked)했고 위험이 감지 안 된 경우에도 커버리지
-  // 한계를 알려야 함 (risks.length>0 분기는 이미 자체 안내문 안에 같은 문구를 포함하고 있어 중복 방지)
-  if (lastOverlayRisks && lastOverlayRisks.checked && lastOverlayRisks.risks.length === 0) {
+  // 위 분기가 무엇이었든(진짜 차단 항목이 없어 계산이 정상 표시된 경우), 지역지구 조회 자체는
+  // 성공(checked)했다는 커버리지 한계 안내 + 참고사항(advisory) 목록을 붙여야 함
+  // (blockingRisks.length>0 분기는 이미 자체 안내문 안에 같은 커버리지 문구를 포함하고 있어 중복 방지)
+  if (blockingRisks.length === 0 && lastOverlayRisks && lastOverlayRisks.checked) {
     noteEl.innerHTML += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
+    if (advisoryRisks.length > 0) {
+      const advisoryHtml = advisoryRisks.map(r =>
+        '<div style="padding:5px 0; border-bottom:1px solid rgba(0,0,0,0.06);"><b>' + r.label + '</b><br><span style="font-size:12px; color:var(--text-muted);">' + r.authority + '</span></div>'
+      ).join('');
+      noteEl.innerHTML += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항이라 위 건폐율/용적률 계산은 그대로 유효하지만, 해당 용도라면 미리 확인하세요:<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
+    }
   } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
     // 지역지구 조회 자체가 실패한 경우 — 아래 건폐율/용적률 숫자는 국토계획법 기준으로는 유효하지만,
     // 개발제한구역 등 중복 여부는 확인 못 했다는 걸 명확히 알려야 함("위험 없음"으로 오인 방지)
@@ -5851,7 +5871,8 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     area: site,
     buildArea: currentBuildArea,
     floorArea: currentFloorArea,
-    overlayRisk: (lastOverlayRisks && lastOverlayRisks.risks.length > 0) ? lastOverlayRisks.risks.map(r => r.label).join(', ')
+    overlayRisk: blockingRisks.length > 0 ? '차단:' + blockingRisks.map(r => r.label).join(',')
+      : advisoryRisks.length > 0 ? '참고:' + advisoryRisks.map(r => r.label).join(',')
       : (lastOverlayRisks && lastOverlayRisks.checked) ? '없음' : '미확인',
   });
 });
