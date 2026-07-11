@@ -1119,7 +1119,13 @@ const CITY_BUILDING_ORDINANCE = {
     // 제38조(일조 등의 확보를 위한 건축물의 높이제한) — 국가기준(시행령 제86조) 그대로 채택, 강화 없음
     sunlight: { heightThresholdM: 10, distUnderM: 1.5, note: '10m 초과 부분은 해당 부분 높이의 1/2 이상' },
     sunlightBasis: '군포시 건축 조례 제38조 (국가기준과 동일)',
-    // 대지안의공지(제36조·별표4)는 HWP 별표 파일이라 아직 원문 미확정 — 반영 보류
+    // 제36조·별표4(대지안의 공지) — ⚠️ 아파트만 인접대지경계선(6m)이 건축선(3m)의 2배
+    setback: {
+      apt:   { road: 3, boundary: 6 },
+      row:   { road: 2, boundary: 2 }, // 연립주택
+      multi: { road: 1, boundary: 1 }, // 다세대주택
+    },
+    setbackBasis: '군포시 건축 조례 제36조·별표4',
   },
   "광주시": {
     // ⚠️ 제31조(대지 안의 조경) — 다른 도시들과 다른 비율: 15/10/5%가 아니라 10/7/5%.
