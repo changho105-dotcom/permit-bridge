@@ -5733,7 +5733,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     trustBadgeEl.innerHTML = '⛔ 미확정 지역 · ' + (lastDetectedSigg || '지자체 미확인') + ' — 결과 제공 안 함';
   }
 
-  // 건축조례(조경·대지안의공지·일조권) 조회 키 — 현재는 서울시만 데이터 있음, 다른 도시는 추가되는 대로 여기 매핑 추가
+  // 건축조례(조경·일조권·대지안의공지) 조회 키 — 현재 서울·경기 32개 시군만 데이터 있음(전국 확장 진행 중)
   const buildingOrdinanceKey = (region === 'seoul') ? '서울특별시'
     : (lastDetectedSigg && CITY_BUILDING_ORDINANCE[lastDetectedSigg]) ? lastDetectedSigg
     : null;
@@ -5788,6 +5788,11 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey){
     landscapeCardEl.style.display = 'block';
     landscapeEl.textContent = landscapeArea.toLocaleString(undefined,{maximumFractionDigits:2}) + ' ㎡';
     landscapeSubEl.textContent = '대지면적의 ' + pct + '% 이상 (' + ordinance.landscapeBasis + ')';
+  } else if (site) {
+    // 서울·경기 외 지역 — 아직 조경면적 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
+    landscapeCardEl.style.display = 'block';
+    landscapeEl.textContent = '—';
+    landscapeSubEl.textContent = '조경면적 기준은 현재 서울·경기 지역만 서비스합니다';
   } else {
     landscapeCardEl.style.display = 'none';
   }
@@ -5799,6 +5804,11 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey){
     sunlightNoteEl.style.display = 'block';
     sunlightNoteEl.className = 'note-box';
     sunlightNoteEl.innerHTML = '☀️ <b>일조권 이격거리 (정북방향 인접대지경계선 기준)</b> — 높이 ' + s.heightThresholdM + 'm 이하 부분: ' + s.distUnderM + 'm 이상 / ' + s.note + '.<br><span style="font-size:12.5px; color:var(--text-muted);">' + ordinance.sunlightBasis + '</span>';
+  } else if (!ordinance && /전용주거지역|일반주거지역/.test(zoneSel.value)) {
+    // 서울·경기 외 지역 — 일조권 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
+    sunlightNoteEl.style.display = 'block';
+    sunlightNoteEl.className = 'note-box';
+    sunlightNoteEl.innerHTML = '☀️ <b>일조권 이격거리</b> — 현재 서울·경기 지역만 서비스합니다.';
   } else {
     sunlightNoteEl.style.display = 'none';
   }
@@ -5819,6 +5829,16 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey){
     setbackNoteEl.style.display = 'block';
     setbackNoteEl.className = 'note-box';
     setbackNoteEl.innerHTML = html;
+  } else if (useType === 'house' && houseSubtype && !ordinance) {
+    // 서울·경기 외 지역 — 대지안의공지 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
+    setbackNoteEl.style.display = 'block';
+    setbackNoteEl.className = 'note-box';
+    setbackNoteEl.innerHTML = '📏 <b>대지 안의 공지 (이격거리)</b> — 현재 서울·경기 지역만 서비스합니다.';
+  } else if (useType === 'house' && houseSubtype && ordinance && !ordinance.setback) {
+    // 서울·경기 지역이지만 별표 파일 미확보(여주시·광주시) — 조례 자체가 없다는 오해 없이 "해당없음" 고지
+    setbackNoteEl.style.display = 'block';
+    setbackNoteEl.className = 'note-box';
+    setbackNoteEl.innerHTML = '📏 <b>대지 안의 공지 (이격거리)</b> — 해당없음(이 지역은 대지안의공지 기준 자료를 확보하지 못했습니다).';
   } else {
     setbackNoteEl.style.display = 'none';
   }
