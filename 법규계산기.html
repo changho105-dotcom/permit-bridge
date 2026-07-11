@@ -586,7 +586,13 @@ const CITY_BUILDING_ORDINANCE = {
     // (이전에 WebFetch 자동요약에서 "9m"로 잘못 나왔던 것을 Kevin 원문 대조로 정정함 — 실제로는 10m)
     sunlight: { heightThresholdM: 10, distUnderM: 1.5, note: '10m 초과 부분은 해당 부분 높이의 1/2 이상' },
     sunlightBasis: '용인시 건축 조례 제36조 [시행 2025.6.30. 제2638호] (국가기준과 동일)',
-    // 대지안의공지(제33조·별표2)는 HWP 별표 파일이라 아직 원문 미확정 — 반영 보류
+    // 제33조·별표2(대지안의 공지) — 서울·수원과 동일하게 다세대주택 인접대지경계선도 명시됨
+    setback: {
+      apt:   { road: 6, boundary: 6, note: '상업지역 도시형생활주택은 건축선 3m 이상' },
+      row:   { road: 3, boundary: 3 }, // 연립주택
+      multi: { road: 1, boundary: 1 }, // 다세대주택
+    },
+    setbackBasis: '용인시 건축 조례 제33조·별표2 [개정 2022.2.28]',
   },
   "고양시": {
     // 제33조(대지안의 조경) — 순수 3단계 구조, 상업지역 별도완화 없음(서울·수원과 다름)
