@@ -1152,7 +1152,13 @@ const CITY_BUILDING_ORDINANCE = {
     // 제36조(일조 등의 확보를 위한 건축물의 높이제한) — 국가기준(시행령 제86조) 그대로 채택, 강화 없음
     sunlight: { heightThresholdM: 10, distUnderM: 1.5, note: '10m 초과 부분은 해당 부분 높이의 1/2 이상' },
     sunlightBasis: '광명시 건축 조례 제36조 (국가기준과 동일)',
-    // 대지안의공지(제34조·별표4)는 HWP 별표 파일이라 아직 원문 미확정 — 반영 보류
+    // 제34조·별표4(대지안의 공지) — 아파트·연립주택은 30세대 미만이면 인접대지경계선 완화(각각 3m/1.5m)
+    setback: {
+      apt:   { road: 3, boundary: 5, note: '30세대 미만은 인접대지경계선 3m 이상' },
+      row:   { road: 2, boundary: 2, note: '30세대 미만은 인접대지경계선 1.5m 이상' }, // 연립주택
+      multi: { road: 1, boundary: 1 }, // 다세대주택
+    },
+    setbackBasis: '광명시 건축 조례 제34조·별표4 [개정 2022.8.2]',
   },
 };
 // ✅ 2026-07-11: 경기도 31개 시군 + 서울특별시 CITY_BUILDING_ORDINANCE(조경+일조권) 32개 전체
