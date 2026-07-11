@@ -271,6 +271,7 @@
     <div class="eyebrow">인허가 브릿지 · 법규 사전 검토 도구</div>
     <h1>건축 법규 계산기</h1>
     <p class="sub">주소만 입력하면 용도지역·대지면적을 자동으로 찾아드립니다. 건폐율·용적률·주차대수 계산은 <b>조례 원문이 확인된 지역에서만</b> 제공합니다 — 확인 안 된 지역은 추정치도 보여드리지 않습니다.</p>
+    <p class="sub" style="margin-top:6px;">🔍 <b>AI 추정이 아닙니다.</b> 국토계획법·건축법 등 실제 법령 원문과 지자체 조례를 직접 확인해 판단합니다.</p>
   </header>
 
   <div class="tabs">
@@ -456,7 +457,7 @@
   </div>
 
   <footer>
-    본 계산 결과는 법규 검토를 돕기 위한 참고용 자료이며, 법적 효력이 없습니다.<br>
+    본 계산 결과는 AI의 추정이 아니라 법령 원문과 지자체 조례를 근거로 산출됩니다. 다만 법규 검토를 돕기 위한 참고용 자료이며, 법적 효력이 없습니다.<br>
     지구단위계획·개발행위허가 제한구역 등 별도 규제가 있을 수 있으니, 최종 확인은 반드시 관할 구청 및 건축사와 진행하세요.<br>
     <a href="#" id="feedbackBtn" style="color:inherit; text-decoration:underline;">불편사항·의견 보내기</a>
   </footer>
@@ -4571,7 +4572,81 @@ async function lookupParcel(addr) {
     showDebug('③ 대지면적 조회 실패: ' + addr, e.message);
   }
 
-  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok };
+  const overlayRisks = await lookupOverlayRisks(item.id, addr);
+
+  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks };
+}
+
+// 국토계획법 용도지역만으로는 확정할 수 없는 "다른 법령에 따른 지역·지구"(개발제한구역·농업진흥구역 등)를
+// VWorld 국가중점데이터(NED) getLandUseAttr API로 감지 (기존 VWORLD_KEY 그대로 사용 가능, 별도 신청 불필요
+// — 2026-07-11 확인). 매칭되면 건폐율/용적률이 그 법령의 별도 절차(허가·협의)에 따라 달라지는 지역이라
+// 이 앱이 확정 계산을 못 줌 — "전문가와 상담하세요" 같은 회피성 안내 대신, 실제로 동의·허가를 받아야 하는
+// 소관기관을 구체적으로 알려줌(2026-07-11 Kevin 피드백: "군부대 동의, 문화재청 동의처럼 기관마다 다르고
+// 실제 인허가 단계에서 오래 걸리는 게 핵심 정보다").
+const OVERLAY_RISK_KEYWORDS = [
+  { kw: '개발제한구역', label: '개발제한구역', authority: '관할 시장·군수·구청장 (개발제한구역법령상 행위허가)' },
+  { kw: '집단취락지구', label: '집단취락지구', authority: '관할 시장·군수·구청장 (개발제한구역법령 특례 허가)' },
+  { kw: '농업진흥', label: '농업진흥구역·농업보호구역', authority: '관할 시장·군수·구청장 (농지법상 농지전용허가)' },
+  { kw: '보전산지', label: '보전산지(임업용·공익용)', authority: '관할 시장·군수·구청장·산림청 (산지관리법상 산지전용허가)' },
+  { kw: '자연공원', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)' },
+  { kw: '공원자연', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)' },
+  { kw: '공원마을', label: '자연공원', authority: '공원관리청 (자연공원법상 행위허가)' },
+  { kw: '상수원보호구역', label: '상수원보호구역', authority: '관할 시장·군수·구청장 (수도법상 행위허가)' },
+  { kw: '문화재보호구역', label: '문화재보호구역', authority: '국가유산청(문화재청)·지자체 (현상변경허가·영향진단)' },
+  { kw: '역사문화환경', label: '역사문화환경 보존지역', authority: '국가유산청(문화재청)·지자체 (현상변경허가·영향진단)' },
+  { kw: '군사시설보호구역', label: '군사시설보호구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
+  { kw: '비행안전', label: '비행안전구역', authority: '관할부대장 (군사기지법상 협의·허가, 높이제한 등)' },
+  { kw: '통제보호구역', label: '군사 통제보호구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
+  { kw: '제한보호구역', label: '군사 제한보호구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
+  { kw: '접도구역', label: '접도구역', authority: '도로관리청 (도로법상 행위허가)' },
+  { kw: '하천구역', label: '하천구역', authority: '하천관리청 (하천법상 점용허가)' },
+  { kw: '토지거래', label: '토지거래허가구역', authority: '관할 시장·군수·구청장 (부동산 거래신고법상 토지거래계약허가 — 건축이 아니라 매매·취득 시 허가 필요)' },
+  { kw: '공장설립', label: '공장설립승인지역', authority: '관할 시장·군수·구청장 (산업집적법상 공장설립승인)' },
+  { kw: '배출시설설치제한', label: '배출시설설치제한지역', authority: '관할 시장·군수·구청장 (대기·수질 배출시설 설치 제한)' },
+  { kw: '대공방어협조구역', label: '대공방어협조구역', authority: '관할부대장 (군사기지법상 협의·허가)' },
+  { kw: '상대보호구역', label: '교육환경보호구역(상대보호구역)', authority: '관할 교육청 (교육환경 보호에 관한 법률상 교육환경평가·허가)' },
+  { kw: '절대보호구역', label: '교육환경보호구역(절대보호구역)', authority: '관할 교육청 (교육환경 보호에 관한 법률상 교육환경평가·허가, 상대보호구역보다 학교에 더 가까워 제한이 강함)' },
+  { kw: '철도', label: '철도 관련시설', authority: '국가철도공단·한국철도공사 또는 관할 철도관리청 (철도안전법상 철도보호지구 협의)' },
+  { kw: '지구단위계획구역', label: '지구단위계획구역', authority: '관할 시장·군수·구청장 (해당 구역 지구단위계획을 확인해야 함 — 일반 용도지역 기준과 다를 수 있음)' },
+  { kw: '중요시설물보호지구', label: '중요시설물보호지구', authority: '관할 시장·군수·구청장·해당 시설 관리기관 (국토계획법 시행령 제76조 보호지구, 예: 공항이면 한국공항공사·인천국제공항공사)' },
+  { kw: '표면구역', label: '공항 장애물제한표면구역(수평·원추·전이·진입표면 등)', authority: '한국공항공사·인천국제공항공사 (공항시설법상 장애물 높이제한 협의)' },
+  { kw: '가축사육제한', label: '가축사육제한구역', authority: '관할 시장·군수·구청장 (가축분뇨의 관리 및 이용에 관한 법률)' },
+];
+// 2026-07-11 강남역 부지(역삼동 858) 테스트로 대공방어협조구역·상대보호구역·철도·지구단위계획구역,
+// 김포공항 인근(강서구 공항동 51-83) 테스트로 중요시설물보호지구·표면구역(공항시설법)·가축사육제한구역
+// 정확한 명칭 확인해서 추가함. 도시철도법 고유 항목(위 "철도"와 별개로 지하철 특정 표기가 있을 수 있음)·
+// 전기사업법(전주·전선로)·도시가스사업법은 아직 실제 사례로 명칭 미확인 — 다음에 관련 주소 테스트할 기회가
+// 있으면 여기 추가할 것.
+
+// 반환값: { risks: [...], checked: true/false } — checked=false(조회 자체가 실패)와 risks=[](정상 조회했는데
+// 해당사항 없음)을 구분해야 함. 조회 실패를 "위험 없음"으로 오인해 확정 계산을 보여주면 안 되기 때문(애매한
+// 정보 금지 원칙) — 대신 조회 실패 시엔 기존처럼 국토계획법 기준 계산은 그대로 보여주되 "지역지구 중복
+// 여부는 확인 못 함" 캡션만 덧붙이고, 실제 위험 감지(checked=true, risks 있음)일 때만 계산을 대체함.
+async function lookupOverlayRisks(pnu, addr){
+  const url = 'https://api.vworld.kr/ned/data/getLandUseAttr'
+    + '?pnu=' + pnu + '&format=json&numOfRows=200&pageNo=1'
+    + '&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
+  try {
+    const data = await vworldRequest(url);
+    showDebug('④ 지역지구 전체 조회 결과: ' + addr, data);
+    const list = data && data.landUses && data.landUses.field;
+    if (!list) return { risks: [], checked: true };
+    const found = [];
+    const seen = new Set();
+    list.forEach(item => {
+      const name = item.prposAreaDstrcCodeNm || '';
+      OVERLAY_RISK_KEYWORDS.forEach(entry => {
+        if (name.includes(entry.kw) && !seen.has(entry.label)) {
+          seen.add(entry.label);
+          found.push({ label: entry.label, raw: name, authority: entry.authority });
+        }
+      });
+    });
+    return { risks: found, checked: true };
+  } catch (e) {
+    showDebug('④ 지역지구 전체 조회 실패: ' + addr, e.message);
+    return { risks: [], checked: false };
+  }
 }
 
 const newSearchBtn = document.getElementById('newSearchBtn');
@@ -4589,6 +4664,7 @@ newSearchBtn.addEventListener('click', () => {
   lastDetectedSigg = null;
   lastDetectedSido = null;
   multiZoneWeighted = null;
+  lastOverlayRisks = null;
   // 주소 조회로 잠겼던 지역/용도지역 선택을 다시 풀고 기본값으로 되돌림
   regionSel.disabled = false;
   zoneSel.disabled = false;
@@ -4638,6 +4714,18 @@ addrSearchBtn.addEventListener('click', async () => {
 
     const first = okResults[0];
 
+    // 필지 중 하나라도 개발제한구역 등 "다른 법령 지역·지구"가 감지되면 전체를 위험으로 취급(가장 보수적).
+    // 전부 조회 성공했고 하나도 안 걸리면 checked=true·risks=[]로 "확인 완료, 이상 없음"을 명확히 구분
+    const allChecked = okResults.every(r => r.overlayRisks && r.overlayRisks.checked);
+    const combinedRisks = [];
+    const riskSeen = new Set();
+    okResults.forEach(r => {
+      (r.overlayRisks && r.overlayRisks.risks || []).forEach(risk => {
+        if (!riskSeen.has(risk.label)) { riskSeen.add(risk.label); combinedRisks.push(risk); }
+      });
+    });
+    lastOverlayRisks = { risks: combinedRisks, checked: allChecked };
+
     // 필지마다 용도지역이 다르면 국토계획법 제84조에 따라 면적 비율로 건폐율·용적률을 가중평균 (하나의 대지로 합쳐서 건축하는 경우)
     multiZoneWeighted = null;
     if (!zoneConsistent) {
@@ -4683,6 +4771,14 @@ addrSearchBtn.addEventListener('click', async () => {
     }
     if (failResults.length > 0) {
       html += '<div class="note-box warn">⚠ 조회 실패: ' + failResults.map(r => r.addr + ' — ' + r.error).join(', ') + '</div>';
+    }
+    if (lastOverlayRisks && lastOverlayRisks.risks.length > 0) {
+      const checklistHtml = lastOverlayRisks.risks.map(r =>
+        '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b><br><span style="font-size:12.5px; color:var(--text-muted);">동의·허가 필요: ' + r.authority + '</span></div>'
+      ).join('');
+      html += '<div class="note-box warn">🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b> (건폐율/용적률 일반 계산 대신 이 목록을 확인하세요):' +
+        '<div style="margin-top:8px;">' + checklistHtml + '</div>' +
+        '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div></div>';
     }
 
     addrResultBox.style.display = 'block';
@@ -4743,6 +4839,7 @@ let lastMaxFloorArea = null; // 건폐율/용적률 탭 계산 결과 → 주차
 let lastDetectedSigg = null; // 주소 자동조회로 확인된 시·군·구명 → CITY_SPECIFIC 조회용
 let lastDetectedSido = null; // 주소 자동조회로 확인된 시·도명 → 구/군 이름 충돌 방지용 (예: "중구"는 여러 도시에 있음)
 let multiZoneWeighted = null; // 필지들이 서로 다른 용도지역에 걸쳐있을 때 면적 가중평균한 {coverage, floor, breakdown} — 국토계획법 제84조
+let lastOverlayRisks = null; // 주소 조회로 감지된 개발제한구역 등 "다른 법령 지역·지구" {risks:[{label,raw}], checked} — 확인 안 됐거나 없으면 null
 
 // 시도/시군구/용도지역명으로 건폐율·용적률 조회 (서울은 SEOUL 상수, 그 외는 CITY_SPECIFIC 조합키→단독키 순으로 폴백)
 function lookupZoneRates(sido, sigg, uname){
@@ -4873,7 +4970,25 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   const trustBadgeEl = document.getElementById('trustBadge');
   let currentBuildArea = null, currentFloorArea = null;
 
-  if(multiZoneWeighted){
+  if (lastOverlayRisks && lastOverlayRisks.risks.length > 0) {
+    // 개발제한구역 등 "다른 법령 지역·지구"가 감지되면 국토계획법 기준 건폐율/용적률 계산 자체가
+    // 무의미해짐(그 법이 우선 적용) — 숫자를 보여주지 않고 감지된 지역·지구를 그대로 안내
+    buildAreaEl.textContent = '—';
+    buildRateEl.textContent = '일반 계산 적용 불가';
+    floorAreaEl.textContent = '—';
+    floorRateEl.textContent = '일반 계산 적용 불가';
+    noteEl.className = 'note-box warn';
+    const overlayChecklistHtml = lastOverlayRisks.risks.map(r =>
+      '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b><br><span style="font-size:12.5px; color:var(--text-muted);">동의·허가 필요: ' + r.authority + '</span></div>'
+    ).join('');
+    noteEl.innerHTML = '🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b>:' +
+      '<div style="margin-top:8px;">' + overlayChecklistHtml + '</div>' +
+      '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div>';
+    lastMaxFloorArea = null;
+    trustBadgeEl.style.background = 'var(--warn-bg)';
+    trustBadgeEl.style.color = 'var(--warn)';
+    trustBadgeEl.innerHTML = '🚧 추가 기관 동의 필요 지역 감지됨';
+  } else if(multiZoneWeighted){
     const buildArea = site * multiZoneWeighted.coverage / 100;
     const floorArea = site * multiZoneWeighted.floor / 100;
     currentBuildArea = buildArea; currentFloorArea = floorArea;
