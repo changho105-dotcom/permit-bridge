@@ -5532,22 +5532,9 @@ addrSearchBtn.addEventListener('click', async () => {
     if (failResults.length > 0) {
       html += '<div class="note-box warn">⚠ 조회 실패: ' + failResults.map(r => r.addr + ' — ' + r.error).join(', ') + '</div>';
     }
-    if (lastOverlayRisks && lastOverlayRisks.risks.length > 0) {
-      const checklistHtml = lastOverlayRisks.risks.map(r =>
-        '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b><br><span style="font-size:12.5px; color:var(--text-muted);">동의·허가 필요: ' + r.authority + '</span></div>'
-      ).join('');
-      html += '<div class="note-box warn">🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b> (건폐율/용적률 일반 계산 대신 이 목록을 확인하세요):' +
-        '<div style="margin-top:8px;">' + checklistHtml + '</div>' +
-        '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div></div>';
-    }
-    if (lastOverlayRisks && lastOverlayRisks.checked) {
-      html += '<div class="note-box" style="font-size:12.5px;">' + OVERLAY_COVERAGE_NOTE + '</div>';
-    } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
-      // API 조회 자체가 실패한 경우 — "위험 없음"으로 오인하면 안 되므로 별도 경고. 이 경우에도 아래
-      // 건폐율/용적률 계산은 그대로 보여주되(국토계획법 기준 계산 자체는 유효하므로), 지역지구 중복
-      // 여부만 확인 못 했다는 걸 명확히 알림
-      html += '<div class="note-box warn">⚠️ <b>지역·지구 중복 확인에 실패했습니다</b> — 개발제한구역 등 다른 법령 지역·지구 해당 여부를 이번 조회에서 확인하지 못했습니다. 새로고침 후 다시 조회하시거나, 관할 시·군·구청에 직접 확인하세요.</div>';
-    }
+    // 지역지구 위험 체크리스트·커버리지 안내·조회실패 경고는 여기서 중복 표시하지 않음 — 주소검색이
+    // 자동으로 계산하기(calcFC)까지 실행시키므로, 같은 내용이 아래 계산결과 영역(noteEl)에 한 번만 뜸
+    // (Kevin 피드백 2026-07-11: 같은 박스가 위아래 2곳에 뜨는 게 불편, "위에 있는 건 없애라")
     if (lastLandCategoryInfo && lastLandCategoryInfo.needsChange) {
       html += '<div class="note-box warn">🚜 <b>지목변경이 필요할 수 있습니다</b> — 이 토지의 지목은 "' + lastLandCategoryInfo.jimoks.join(', ') + '"로, 건축을 위해서는 먼저 지목변경(토목 인허가)이 필요합니다. 건축사뿐 아니라 <b>토목기술사 상담도 함께 받아보시길 권장합니다</b>.</div>';
     }
