@@ -5542,6 +5542,11 @@ addrSearchBtn.addEventListener('click', async () => {
     }
     if (lastOverlayRisks && lastOverlayRisks.checked) {
       html += '<div class="note-box" style="font-size:12.5px;">' + OVERLAY_COVERAGE_NOTE + '</div>';
+    } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
+      // API 조회 자체가 실패한 경우 — "위험 없음"으로 오인하면 안 되므로 별도 경고. 이 경우에도 아래
+      // 건폐율/용적률 계산은 그대로 보여주되(국토계획법 기준 계산 자체는 유효하므로), 지역지구 중복
+      // 여부만 확인 못 했다는 걸 명확히 알림
+      html += '<div class="note-box warn">⚠️ <b>지역·지구 중복 확인에 실패했습니다</b> — 개발제한구역 등 다른 법령 지역·지구 해당 여부를 이번 조회에서 확인하지 못했습니다. 새로고침 후 다시 조회하시거나, 관할 시·군·구청에 직접 확인하세요.</div>';
     }
     if (lastLandCategoryInfo && lastLandCategoryInfo.needsChange) {
       html += '<div class="note-box warn">🚜 <b>지목변경이 필요할 수 있습니다</b> — 이 토지의 지목은 "' + lastLandCategoryInfo.jimoks.join(', ') + '"로, 건축을 위해서는 먼저 지목변경(토목 인허가)이 필요합니다. 건축사뿐 아니라 <b>토목기술사 상담도 함께 받아보시길 권장합니다</b>.</div>';
@@ -5840,6 +5845,10 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   // 한계를 알려야 함 (risks.length>0 분기는 이미 자체 안내문 안에 같은 문구를 포함하고 있어 중복 방지)
   if (lastOverlayRisks && lastOverlayRisks.checked && lastOverlayRisks.risks.length === 0) {
     noteEl.innerHTML += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
+  } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
+    // 지역지구 조회 자체가 실패한 경우 — 아래 건폐율/용적률 숫자는 국토계획법 기준으로는 유효하지만,
+    // 개발제한구역 등 중복 여부는 확인 못 했다는 걸 명확히 알려야 함("위험 없음"으로 오인 방지)
+    noteEl.innerHTML += '<div style="margin-top:8px;" class="note-box warn">⚠️ <b>지역·지구 중복 확인에 실패했습니다</b> — 개발제한구역 등 다른 법령 지역·지구 해당 여부를 확인하지 못했습니다. 새로고침 후 다시 조회하시거나, 관할 시·군·구청에 직접 확인하세요.</div>';
   }
 
   // 건축조례(조경·일조권·대지안의공지) 조회 키 — 현재 서울·경기 32개 시군만 데이터 있음(전국 확장 진행 중)
