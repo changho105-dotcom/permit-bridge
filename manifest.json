@@ -1,10 +1,13 @@
 {
+  "id": "/법규계산기.html",
   "name": "인허가브릿지 - 법규 계산기",
   "short_name": "인허가브릿지",
   "description": "주소만 입력하면 용도지역·건폐율·용적률·건축 규제를 자동으로 확인하는 무료 법규 사전검토 도구",
   "start_url": "./법규계산기.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["utilities", "productivity", "business"],
   "background_color": "#FAF6EE",
   "theme_color": "#14315C",
   "lang": "ko",
