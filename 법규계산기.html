@@ -270,6 +270,16 @@
     margin-top:22px;
     line-height:1.6;
   }
+
+  /* PDF 저장(window.print) — #fcResults만 보이게, 입력폼·버튼류(.no-print)는 숨김.
+     별도 라이브러리 없이 브라우저 인쇄 대화상자의 "PDF로 저장"을 그대로 활용(단일 파일 원칙 유지) */
+  @media print {
+    body * { visibility: hidden; }
+    #fcResults, #fcResults * { visibility: visible; }
+    #fcResults { position: absolute; left: 0; top: 0; width: 100%; }
+    #printHeader { display: block !important; }
+    .no-print { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -376,6 +386,10 @@
     <button class="calc-btn" id="calcFC">계산하기</button>
 
     <div class="results" id="fcResults" style="display:none;">
+      <div id="printHeader" style="display:none;">
+        <h2 style="margin:0 0 4px; font-size:18px;">인허가 브릿지 — 법규 계산 결과</h2>
+        <div id="printMeta" style="font-size:12.5px; margin-bottom:14px; color:var(--ink-deep);"></div>
+      </div>
       <div id="trustBadge" style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; margin-bottom:10px; line-height:1.4;"></div>
       <div class="result-grid">
         <div class="result-card">
@@ -409,7 +423,8 @@
       <div class="note-box" id="fcSetbackNote" style="display:none;"></div>
       <div class="note-box" id="fcSunlightNote" style="display:none;"></div>
       <div class="note-box" id="fcNote"></div>
-      <div style="margin-top:16px; padding:16px; border:1.5px dashed var(--ink); border-radius:8px;">
+      <button type="button" id="pdfSaveBtn" class="no-print" style="width:100%; margin-top:12px; padding:11px; border:1.5px solid var(--ink); border-radius:8px; background:transparent; color:var(--ink-deep); font-size:13.5px; cursor:pointer;">📄 이 결과 PDF로 저장</button>
+      <div class="no-print" style="margin-top:16px; padding:16px; border:1.5px dashed var(--ink); border-radius:8px;">
         <div id="consultLabel" style="font-size:13.5px; color:var(--ink-deep); margin-bottom:10px; text-align:center;">이 결과로 건축사 상담을 받아보고 싶으신가요?</div>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
           <input type="text" id="consultName" placeholder="이름" style="flex:1; min-width:0; padding:9px 10px; border:1px solid var(--ink); border-radius:6px; font-size:13.5px;">
@@ -5936,6 +5951,13 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   renderExtraResults(currentBuildArea, currentFloorArea, site, buildingOrdinanceKey, !!juklakRisk);
   resultsBox.style.display = 'block';
 
+  // PDF 저장(인쇄) 시 상단에 표시할 요약 — 화면에는 안 보이고 @media print에서만 노출됨
+  const printAddrs = Array.from(document.querySelectorAll('.addrInputRow')).map(el => el.value.trim()).filter(v => v).join(', ');
+  document.getElementById('printMeta').innerHTML =
+    (printAddrs ? '주소: ' + printAddrs + '<br>' : '') +
+    '지역: ' + regionSel.selectedOptions[0].textContent + ' · 용도지역: ' + zoneName + '<br>' +
+    '대지면적: ' + site.toLocaleString(undefined,{maximumFractionDigits:2}) + ' ㎡ · 조회일: ' + new Date().toISOString().slice(0,10);
+
   logToSheet({
     addr: Array.from(document.querySelectorAll('.addrInputRow')).map(el => el.value.trim()).filter(v => v).join(', '),
     zone: zoneName,
@@ -6178,6 +6200,13 @@ function computeParking(type, area, units, unitSize){
 
 // title block date
 document.getElementById('tbDate').textContent = new Date().toISOString().slice(0,10);
+
+// 결과 PDF 저장 — 별도 라이브러리 없이 브라우저 인쇄창의 "PDF로 저장"을 그대로 활용
+// (2026-07-13 Kevin: 일본 데베NAVI 벤치마크 — 계산 결과를 저장·공유할 수 있어야 함)
+document.getElementById('pdfSaveBtn').addEventListener('click', () => {
+  if (typeof gtag === 'function') { gtag('event', 'pdf_save_click'); }
+  window.print();
+});
 
 // 건축사 상담 신청 (MVP: 별도 서버/DB 없이 sms 링크로 접수 문자 발송 — 추후 실제 파트너 매칭 폼/DB로 교체 예정)
 const CONSULT_PHONE = '01053073335'; // 상담 신청 받을 연락처. 바뀌면 여기만 수정하면 됨
