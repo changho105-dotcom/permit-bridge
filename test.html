@@ -5589,6 +5589,18 @@ function flagInvalid(inputEl) {
   setTimeout(() => { inputEl.style.borderColor = ''; inputEl.style.boxShadow = ''; }, 1800);
 }
 
+// 지역·지구 리스크 1건을 체크리스트 항목 HTML로 렌더링. r.label(중분류 — 이 앱이 붙인 표준 명칭)만
+// 보여주면 VWorld 원문의 더 구체적인 소분류 정보(예: "비행안전제3구역(전술)"처럼 구역 번호·유형까지
+// 포함된 표기)가 사라져 사용자가 손해를 봄 — r.raw(VWorld prposAreaDstrcCodeNm 원문)가 label과
+// 다르면 함께 보여줌(2026-07-11 Kevin 피드백: "대분류로만 모이는데 중분류·소분류도 표현해").
+function renderRiskItem(r, authorityPrefix) {
+  const rawHtml = (r.raw && r.raw !== r.label)
+    ? ' <span style="font-size:12.5px; font-weight:400; color:var(--text-muted);">— ' + r.raw + '</span>'
+    : '';
+  return '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b>' + rawHtml +
+    '<br><span style="font-size:12.5px; color:var(--text-muted);">' + (authorityPrefix || '') + r.authority + '</span></div>';
+}
+
 const fcUseTypeSel = document.getElementById('fcUseType');
 const fcHouseFields = document.getElementById('fc-house-fields');
 fcUseTypeSel.addEventListener('change', ()=>{
@@ -5707,9 +5719,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
       lastMaxFloorArea = null;
     }
     noteEl.className = 'note-box warn';
-    const overlayChecklistHtml = blockingRisks.map(r =>
-      '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b><br><span style="font-size:12.5px; color:var(--text-muted);">동의·허가 필요: ' + r.authority + '</span></div>'
-    ).join('');
+    const overlayChecklistHtml = blockingRisks.map(r => renderRiskItem(r, '동의·허가 필요: ')).join('');
     let html = '🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b>:' +
       '<div style="margin-top:8px;">' + overlayChecklistHtml + '</div>' +
       '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div>' +
@@ -5717,6 +5727,13 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     if (juklakRisk) {
       html += '<div class="note-box" style="margin-top:8px; background:var(--paper); border-color:var(--ink);">🏘️ <b>위 건폐율·용적률·층수는 집단취락지구 국가기준 상한(참고치)입니다</b> — 이 부지는 기존 마을(취락)로 완전 금지가 아니라 완화된 기준이 적용됩니다.<br>' +
         '<span style="font-size:12.5px; color:var(--text-muted);">개발제한구역법령상 전국 공통 상한이며, 정확한 수치는 지자체 조례로 별도 확정되니 반드시 관할 구청에 확인하세요.</span></div>';
+    }
+    // 차단 항목 외에 추가로 감지된 참고사항(blocking:false)도 놓치지 않고 함께 보여줌 — 이전엔 이 분기에서
+    // 아예 누락됐음(예: 교문동 416-11은 집단취락지구·개발제한구역 외에도 비행안전구역·배출시설설치제한지역·
+    // 공장설립승인지역·과밀억제권역·토지거래허가구역까지 5건이 더 감지되는데 전부 화면에서 사라졌었음).
+    if (advisoryRisks.length > 0) {
+      const advisoryHtml = advisoryRisks.map(r => renderRiskItem(r)).join('');
+      html += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항입니다:<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
     }
     html += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     noteEl.innerHTML = html;
@@ -5795,9 +5812,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   if (blockingRisks.length === 0 && lastOverlayRisks && lastOverlayRisks.checked) {
     noteEl.innerHTML += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     if (advisoryRisks.length > 0) {
-      const advisoryHtml = advisoryRisks.map(r =>
-        '<div style="padding:5px 0; border-bottom:1px solid rgba(0,0,0,0.06);"><b>' + r.label + '</b><br><span style="font-size:12px; color:var(--text-muted);">' + r.authority + '</span></div>'
-      ).join('');
+      const advisoryHtml = advisoryRisks.map(r => renderRiskItem(r)).join('');
       noteEl.innerHTML += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항이라 위 건폐율/용적률 계산은 그대로 유효하지만, 해당 용도라면 미리 확인하세요:<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
     }
   } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
