@@ -428,6 +428,11 @@
       </div>
       <div class="note-box" id="fcSetbackNote" style="display:none;"></div>
       <div class="note-box" id="fcSunlightNote" style="display:none;"></div>
+      <div class="note-box" id="sunlightCalcBox" style="display:none;">
+        <label for="sunlightDistInput" style="display:block; font-size:13px; font-weight:600; color:var(--ink-deep); margin-bottom:7px;">📐 정북 방향 인접대지경계선까지의 거리로 최고 높이 계산 (m, 선택)</label>
+        <input type="number" id="sunlightDistInput" placeholder="예: 3" min="0" step="0.01">
+        <div id="sunlightCalcResult" style="margin-top:8px; font-size:13px;"></div>
+      </div>
       <div class="note-box" id="fcNote"></div>
       <button type="button" id="pdfSaveBtn" class="no-print" style="width:100%; margin-top:12px; padding:11px; border:1.5px solid var(--ink); border-radius:8px; background:transparent; color:var(--ink-deep); font-size:13.5px; cursor:pointer;">📄 이 결과 PDF로 저장</button>
       <div class="no-print" style="margin-top:16px; padding:16px; border:1.5px dashed var(--ink); border-radius:8px;">
@@ -5626,6 +5631,30 @@ let lastDetectedSido = null; // 주소 자동조회로 확인된 시·도명 →
 let multiZoneWeighted = null; // 필지들이 서로 다른 용도지역에 걸쳐있을 때 면적 가중평균한 {coverage, floor, breakdown} — 국토계획법 제84조
 let lastOverlayRisks = null; // 주소 조회로 감지된 개발제한구역 등 "다른 법령 지역·지구" {risks:[{label,raw}], checked} — 확인 안 됐거나 없으면 null
 let lastNarrowestRoad = null; // 건축선 후퇴(건축법 제46조) 판단용 — 이 필지가 접한 도로 중 가장 좁은 폭 {width, raw} — 없으면 null
+let lastSunlightRule = null; // 일조권 사선 계산(건축법 시행령 제86조)용 — 현재 조회된 조례의 {heightThresholdM, distUnderM} — 미확정이면 null
+
+// 건축법 시행령 제86조 1호 — 정북방향 인접대지경계선으로부터 거리 d(m)가 주어졌을 때 그 지점에서
+// 허용되는 건축물 최고 높이(m). d가 최소 이격거리(distUnderM) 미만이면 그 지점엔 건축 자체가 불가(0),
+// 그 이상이면 threshold까지는 threshold 높이가 허용되고, d가 threshold/2를 넘으면 높이는 2d까지 허용됨
+// (나호 "높이의 1/2 이상 이격" 규정을 역산한 결과 — 국가/지자체 확정 조례 수치에만 적용하는 결정론적 계산)
+function computeSunlightMaxHeight(d, rule) {
+  if (!(d >= 0) || !rule) return null;
+  if (d < rule.distUnderM) return 0;
+  if (d < rule.heightThresholdM / 2) return rule.heightThresholdM;
+  return d * 2;
+}
+function renderSunlightCalc() {
+  const box = document.getElementById('sunlightCalcResult');
+  const d = parseFloat(document.getElementById('sunlightDistInput').value);
+  if (!lastSunlightRule || !(d >= 0)) { box.textContent = ''; return; }
+  const maxH = computeSunlightMaxHeight(d, lastSunlightRule);
+  if (maxH === 0) {
+    box.innerHTML = '⛔ 이 거리(' + d + 'm)는 최소 이격거리(' + lastSunlightRule.distUnderM + 'm) 미달이라, 이 지점에는 건축물을 세울 수 없습니다.';
+  } else {
+    box.innerHTML = '이 지점(정북 인접대지경계선으로부터 ' + d + 'm)에서 허용되는 <b>최고 높이: 약 ' + maxH.toFixed(2) + 'm</b><br><span style="font-size:12px; color:var(--text-muted);">건축법 시행령 제86조상 이격거리 규정을 역산한 값으로, 실제 최고높이는 가로구역별 높이제한 등 다른 규정에 따라 더 낮아질 수 있습니다.</span>';
+  }
+}
+document.getElementById('sunlightDistInput').addEventListener('input', renderSunlightCalc);
 let lastLandCategoryInfo = null; // 주소 조회로 확인된 지목 정보 {needsChange, jimoks:[...]} — 지목이 "대"가 아니면 건축 전 지목변경(토목 인허가)이 필요함. 확인 안 됐으면 null
 
 // 지목이 "대"가 아닌 필지가 하나라도 있으면(=지목변경 필요) 상담 신청 버튼 문구를 "건축사·토목기술사"로 전환.
@@ -6070,6 +6099,8 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
     landscapeCardEl.style.display = 'none';
     setbackNoteEl.style.display = 'none';
     sunlightNoteEl.style.display = 'none';
+    document.getElementById('sunlightCalcBox').style.display = 'none';
+    lastSunlightRule = null;
     parkEl.textContent = '—';
     parkSubEl.textContent = '확인 안 됨';
     return;
@@ -6097,18 +6128,26 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
 
   // 일조권 — 전용주거·일반주거지역이고 조례 데이터가 있을 때만 안내 (구체적 이격거리는 건물 높이에 따라
   // 달라져 카드 숫자가 아니라 안내문으로 표시)
+  const sunlightCalcBoxEl = document.getElementById('sunlightCalcBox');
   if (ordinance && ordinance.sunlight && /전용주거지역|일반주거지역/.test(zoneSel.value)) {
     const s = ordinance.sunlight;
     sunlightNoteEl.style.display = 'block';
     sunlightNoteEl.className = 'note-box';
     sunlightNoteEl.innerHTML = '☀️ <b>일조권 이격거리 (정북방향 인접대지경계선 기준)</b> — 높이 ' + s.heightThresholdM + 'm 이하 부분: ' + s.distUnderM + 'm 이상 / ' + s.note + '.<br><span style="font-size:12.5px; color:var(--text-muted);">' + ordinance.sunlightBasis + '</span>';
+    lastSunlightRule = { heightThresholdM: s.heightThresholdM, distUnderM: s.distUnderM };
+    sunlightCalcBoxEl.style.display = 'block';
+    renderSunlightCalc();
   } else if (!ordinance && /전용주거지역|일반주거지역/.test(zoneSel.value)) {
     // 서울·경기 외 지역 — 일조권 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
     sunlightNoteEl.style.display = 'block';
     sunlightNoteEl.className = 'note-box';
     sunlightNoteEl.innerHTML = '☀️ <b>일조권 이격거리</b> — 현재 서울·경기 지역만 서비스합니다.';
+    lastSunlightRule = null;
+    sunlightCalcBoxEl.style.display = 'none';
   } else {
     sunlightNoteEl.style.display = 'none';
+    lastSunlightRule = null;
+    sunlightCalcBoxEl.style.display = 'none';
   }
 
   // 대지안의 공지 — 공동주택(house)이고 세부유형을 선택했을 때만, 조례 데이터가 있는 도시에서 표시
