@@ -17,7 +17,7 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>법규 계산기 — 건폐율·용적률·주차대수</title>
+<title>법규 계산기 — 건폐율·용적률</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -294,7 +294,7 @@
   <header>
     <div class="eyebrow">인허가 브릿지 · 법규 사전 검토 도구</div>
     <h1>건축 법규 계산기</h1>
-    <p class="sub">주소만 입력하면 용도지역·대지면적을 자동으로 찾아드립니다. 건폐율·용적률·주차대수 계산은 <b>조례 원문이 확인된 지역에서만</b> 제공합니다 — 확인 안 된 지역은 추정치도 보여드리지 않습니다.</p>
+    <p class="sub">주소만 입력하면 용도지역·대지면적을 자동으로 찾아드립니다. 건폐율·용적률 계산은 <b>조례 원문이 확인된 지역에서만</b> 제공합니다 — 확인 안 된 지역은 추정치도 보여드리지 않습니다.</p>
     <p class="sub" style="margin-top:6px;">🔍 <b>AI 추정이 아닙니다.</b> 국토계획법·건축법 등 실제 법령 원문과 지자체 조례를 직접 확인해 판단합니다.</p>
   </header>
 
@@ -351,7 +351,7 @@
     </div>
 
     <div class="field">
-      <label for="fcUseType">건물 용도 (선택 — 입력하면 층수·주차대수까지 함께 계산됩니다)</label>
+      <label for="fcUseType">건물 용도 (선택 — 입력하면 층수까지 함께 계산됩니다)</label>
       <select id="fcUseType">
         <option value="">선택 안 함</option>
         <option value="danok">단독주택 (다가구주택 제외)</option>
@@ -381,18 +381,6 @@
           <option value="apt">아파트 (5개 층 이상)</option>
         </select>
       </div>
-      <div class="field">
-        <label for="fcUnitCount">세대 수</label>
-        <input type="number" id="fcUnitCount" placeholder="예: 8" min="0" step="1">
-      </div>
-      <div class="field">
-        <label for="fcUnitSize">세대당 평균 전용면적 (㎡)</label>
-        <select id="fcUnitSize">
-          <option value="60">60㎡ 이하</option>
-          <option value="85">60㎡ 초과 ~ 85㎡ 이하</option>
-          <option value="120">85㎡ 초과</option>
-        </select>
-      </div>
     </div>
 
     <button class="calc-btn" id="calcFC">계산하기</button>
@@ -415,21 +403,11 @@
           <div class="rsub" id="fcFloorRate">-</div>
         </div>
       </div>
-      <div class="result-grid result-grid-3" id="fcExtraGrid">
+      <div class="result-grid" id="fcExtraGrid" style="grid-template-columns:1fr;">
         <div class="result-card" id="fcFloorsCard" style="display:none;">
           <div class="rlabel">층수 제한</div>
           <div class="rval" id="fcFloors">-</div>
           <div class="rsub" id="fcFloorsSub">-</div>
-        </div>
-        <div class="result-card">
-          <div class="rlabel">필요 주차대수</div>
-          <div class="rval" id="fcParking">-</div>
-          <div class="rsub" id="fcParkingSub">-</div>
-        </div>
-        <div class="result-card" id="fcLandscapeCard" style="display:none;">
-          <div class="rlabel">조경면적 (최소)</div>
-          <div class="rval" id="fcLandscape">-</div>
-          <div class="rsub" id="fcLandscapeSub">-</div>
         </div>
       </div>
       <div class="note-box" id="fcSetbackNote" style="display:none;"></div>
@@ -454,7 +432,7 @@
   </section>
 
   <div class="titleblock">
-    <div class="tb-item"><div class="tb-k">기준</div><div class="tb-v">국토계획법 · 서울시 도시계획조례 · 주차장법 시행령</div></div>
+    <div class="tb-item"><div class="tb-k">기준</div><div class="tb-v">국토계획법 · 서울시 도시계획조례</div></div>
     <div class="tb-item"><div class="tb-k">적용범위</div><div class="tb-v">전국</div></div>
     <div class="tb-item"><div class="tb-k">기준일</div><div class="tb-v" id="tbDate">-</div></div>
     <div class="tb-item"><div class="tb-k">용도</div><div class="tb-v">사전 검토용</div></div>
@@ -505,7 +483,7 @@
   ===========================================================
   법규 계산기 (Permit Bridge MVP)
   ===========================================================
-  기능: 주소 입력 → PNU/좌표 → 용도지역 → 대지면적 → 건폐율·용적률·주차대수 자동계산
+  기능: 주소 입력 → PNU/좌표 → 용도지역 → 대지면적 → 건폐율·용적률 자동계산
   대상지역: 서울특별시(조례 원문 확정값) + CITY_SPECIFIC에 등록된 시·군·구(조례 원문 확정값)
   ※ 확정 데이터가 없는 지역은 추정치를 절대 표시하지 않고, 결과 계산 자체를 차단함 (신뢰성 최우선 원칙)
 
@@ -520,7 +498,6 @@
 
   알려진 한계
   - 경기·인천 중 CITY_SPECIFIC에 없는 시·군·구는 결과를 아예 제공하지 않음(추정치 표시 금지 원칙)
-  - 주차대수는 주차장법 시행령 별표1의 국가 최소기준만 반영 (지자체 조례 강화분 미반영)
   - 이 계산 결과는 참고용이며 법적 효력 없음 (관할 구청·건축사 확인 필수)
   ===========================================================
 */
@@ -5631,7 +5608,7 @@ regionSel.addEventListener('change', () => { multiZoneWeighted = null; updateAll
 zoneSel.addEventListener('change', () => { multiZoneWeighted = null; });
 
 // ---------- Tabs ----------
-let lastMaxFloorArea = null; // 건폐율/용적률 탭 계산 결과 → 주차대수 탭 자동 연계용
+let lastMaxFloorArea = null; // 건폐율/용적률 탭 계산 결과 저장용
 let lastDetectedSigg = null; // 주소 자동조회로 확인된 시·군·구명 → CITY_SPECIFIC 조회용
 let lastDetectedSido = null; // 주소 자동조회로 확인된 시·도명 → 구/군 이름 충돌 방지용 (예: "중구"는 여러 도시에 있음)
 let multiZoneWeighted = null; // 필지들이 서로 다른 용도지역에 걸쳐있을 때 면적 가중평균한 {coverage, floor, breakdown} — 국토계획법 제84조
@@ -5979,7 +5956,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     floorRateEl.textContent = '용적률 ' + z.floor + '% 기준';
     let noteHtml = '<b>' + zoneName + '</b> · 서울특별시 도시계획 조례 제54·55조 기준입니다.';
     if(z.tempNote){ noteHtml += '<br>⚠ ' + z.tempNote; }
-    noteHtml += '<br>지구단위계획구역, 정비구역, 도로 조건 등에 따라 실제 적용 수치는 달라질 수 있습니다.';
+    noteHtml += '<br>지구단위계획구역, 정비구역, 도로 조건 등에 따라 실제 적용 수치는 달라질 수 있습니다. 자세한 내용은 아래 내용을 참고 하세요.';
     noteEl.className = 'note-box';
     noteEl.innerHTML = noteHtml;
     lastMaxFloorArea = { value: floorArea, approx: false };
@@ -5997,7 +5974,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     floorAreaEl.textContent = floorArea.toLocaleString(undefined,{maximumFractionDigits:2}) + ' ㎡';
     floorRateEl.textContent = '용적률 ' + z.floor + '% 기준';
     noteEl.className = 'note-box';
-    noteEl.innerHTML = '<b>' + zoneName + '</b> · ' + lastDetectedSigg + ' 도시계획 조례 원문으로 확인된 수치입니다.<br>지구단위계획구역, 정비구역, 도로 조건 등에 따라 실제 적용 수치는 달라질 수 있습니다.';
+    noteEl.innerHTML = '<b>' + zoneName + '</b> · ' + lastDetectedSigg + ' 도시계획 조례 원문으로 확인된 수치입니다.<br>지구단위계획구역, 정비구역, 도로 조건 등에 따라 실제 적용 수치는 달라질 수 있습니다. 자세한 내용은 아래 내용을 참고 하세요.';
     lastMaxFloorArea = { value: floorArea, approx: false };
     trustBadgeEl.style.background = 'var(--success-bg)';
     trustBadgeEl.style.color = 'var(--success)';
@@ -6070,8 +6047,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
   });
 });
 
-// 층수 제한(법적으로 확정된 경우만 표시) · 주차대수(건물 용도를 입력하면 함께 계산되는 통합 결과)
-// 조경면적은 전국 공통기준이 없고 지자체 조례 데이터도 미수집이라 기능 자체를 뺌(2026-07-10, 애매한 정보 금지 원칙)
+// 층수 제한(법적으로 확정된 경우만 표시). 주차대수·조경면적은 2026-07-13 Kevin 결정으로 기능 자체를 최종 삭제
 // 공동주택이 "아파트를 제외한" 형태로만 조례 위임 허용되는 용도지역 (국토계획법 시행령 별표4·5·16·17·19·20).
 // 주택법상 아파트는 5개층 이상이므로, 이 지역들의 공동주택은 사실상 4개층 이하로 제한됨
 // ⚠️ 2026-07-11 실제 별표4·5 원문(law.go.kr flDownload) 확인 결과 제1종·제2종일반주거지역도 "공동주택
@@ -6088,11 +6064,6 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
   const floorsCardEl = document.getElementById('fcFloorsCard');
   const floorsEl = document.getElementById('fcFloors');
   const floorsSubEl = document.getElementById('fcFloorsSub');
-  const parkEl = document.getElementById('fcParking');
-  const parkSubEl = document.getElementById('fcParkingSub');
-  const landscapeCardEl = document.getElementById('fcLandscapeCard');
-  const landscapeEl = document.getElementById('fcLandscape');
-  const landscapeSubEl = document.getElementById('fcLandscapeSub');
   const setbackNoteEl = document.getElementById('fcSetbackNote');
   const sunlightNoteEl = document.getElementById('fcSunlightNote');
   const useType = fcUseTypeSel.value;
@@ -6102,34 +6073,11 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
 
   if(!buildArea || !floorArea){
     floorsCardEl.style.display = 'none';
-    landscapeCardEl.style.display = 'none';
     setbackNoteEl.style.display = 'none';
     sunlightNoteEl.style.display = 'none';
     document.getElementById('sunlightCalcBox').style.display = 'none';
     lastSunlightRule = null;
-    parkEl.textContent = '—';
-    parkSubEl.textContent = '확인 안 됨';
     return;
-  }
-
-  // 조경면적 — 건축조례에 확정 데이터가 있는 도시만 표시. 연면적 구간에 따라 대지면적 대비 비율 적용.
-  // 일부 도시(예: 수원시)는 특정 용도지역(중심상업지역 등)에 규모 무관 별도 비율을 적용하므로 landscapeByZone 우선 확인
-  if (ordinance && ordinance.landscape && site) {
-    const brackets = (ordinance.landscapeByZone && ordinance.landscapeByZone[zoneSel.value])
-      ? ordinance.landscapeByZone[zoneSel.value] : ordinance.landscape;
-    const bracket = brackets.find(b => floorArea >= b.minFloorArea);
-    const pct = bracket ? bracket.pct : brackets[brackets.length - 1].pct;
-    const landscapeArea = site * pct / 100;
-    landscapeCardEl.style.display = 'block';
-    landscapeEl.textContent = landscapeArea.toLocaleString(undefined,{maximumFractionDigits:2}) + ' ㎡';
-    landscapeSubEl.textContent = '대지면적의 ' + pct + '% 이상 (' + ordinance.landscapeBasis + ')';
-  } else if (site) {
-    // 서울·경기 외 지역 — 아직 조경면적 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
-    landscapeCardEl.style.display = 'block';
-    landscapeEl.textContent = '—';
-    landscapeSubEl.textContent = '조경면적 기준은 현재 서울·경기 지역만 서비스합니다';
-  } else {
-    landscapeCardEl.style.display = 'none';
   }
 
   // 일조권 — 전용주거·일반주거지역이고 조례 데이터가 있을 때만 안내 (구체적 이격거리는 건물 높이에 따라
@@ -6216,96 +6164,6 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
   } else {
     floorsCardEl.style.display = 'none';
   }
-
-  // 주차대수: 건물 용도를 선택한 경우에만 계산 (미선택 시 안내만 표시)
-  if(!useType){
-    parkEl.textContent = '—';
-    parkSubEl.textContent = '건물 용도를 선택하세요';
-    return;
-  }
-  let result;
-  if(useType === 'house'){
-    const units = parseFloat(document.getElementById('fcUnitCount').value);
-    const size = document.getElementById('fcUnitSize').value;
-    result = computeParking(useType, null, units, size);
-  } else {
-    result = computeParking(useType, floorArea, null, null);
-  }
-  if(!result){
-    parkEl.textContent = '—';
-    parkSubEl.textContent = useType === 'house' ? '세대 수를 입력하세요' : '확인 안 됨';
-  } else {
-    parkEl.textContent = result.count.toFixed(2) + '대';
-    parkSubEl.textContent = result.basis;
-  }
-}
-
-// ---------- 주차대수 계산 (공용 함수 — 건폐율·용적률 탭과 주차대수 탭에서 같이 사용) ----------
-// type이 'house'면 area는 무시하고 units/unitSize 사용, 그 외 타입은 area 사용. 필수 입력 없으면 null 반환
-function computeParking(type, area, units, unitSize){
-  if(type === 'house'){
-    if(!units || units <= 0) return null;
-    let perUnit;
-    if(unitSize === '60'){ perUnit = 0.7; }
-    else if(unitSize === '85'){ perUnit = 1.0; }
-    else { perUnit = 1.3; }
-    return {
-      count: units * perUnit,
-      basis: '세대당 ' + perUnit + '대 기준 (주택건설기준 등에 관한 규정 제27조, 전용면적 구간별 최소기준)',
-      note: '다세대·연립·아파트 등 공동주택 및 다가구주택에 적용되는 <b>국가 최소기준</b>입니다. 시·군 조례로 더 강화될 수 있으며, 85㎡ 초과 구간은 지자체별로 1.3~1.5대까지 다르게 정해질 수 있어 반드시 관할 지자체 기준을 확인하세요.'
-    };
-  }
-
-  if(!area || area <= 0) return null;
-
-  if(type === 'danok'){
-    // 단독주택: 50㎡ 초과 150㎡ 이하 1대, 150㎡ 초과분은 100㎡당 1대 추가
-    let count;
-    if(area <= 50){ count = 0; }
-    else if(area <= 150){ count = 1; }
-    else { count = 1 + (area - 150) / 100; }
-    return {
-      count,
-      basis: '단독주택 기준 (주차장법 시행령 별표1) — 시설면적 150㎡ 초과분은 100㎡당 1대 추가',
-      note: '다가구주택은 이 기준이 아닌 공동주택 기준(세대별 산정)을 적용합니다.'
-    };
-  }
-
-  // 주차장법 시행령 별표1 <개정 2021.3.30> 원문(law.go.kr flDownload) 실제 확인해 divisor 전면 재검증
-  // (2026-07-11) — 근린생활시설·숙박시설은 종전 134㎡로 잘못 반영돼 있었으나 원문은 200㎡가 맞음
-  let divisor, basis;
-  if(type === 'neighbor1' || type === 'neighbor2' || type === 'lodging'){
-    divisor = 200;
-    basis = '제1·2종 근린생활시설·숙박시설 기준 — 시설면적 200㎡당 1대';
-  } else if(type === 'culture' || type === 'religion' || type === 'sales' || type === 'transport' || type === 'medical' || type === 'sports' || type === 'business'){
-    divisor = 150;
-    basis = '문화및집회시설·종교시설·판매시설·운수시설·의료시설·운동시설·업무시설 기준 — 시설면적 150㎡당 1대 (오피스텔·정신병원·요양병원·격리병원·골프장·골프연습장·옥외수영장·외국공관 제외)';
-  } else if(type === 'training'){
-    divisor = 350;
-    basis = '수련시설 기준 — 시설면적 350㎡당 1대';
-  } else if(type === 'factory' || type === 'power'){
-    divisor = 350;
-    basis = '공장(아파트형 제외)·발전시설 기준 — 시설면적 350㎡당 1대';
-  } else if(type === 'warehouse'){
-    divisor = 400;
-    basis = '창고시설 기준 — 시설면적 400㎡당 1대';
-  } else if(type === 'funeral'){
-    divisor = 150;
-    basis = '장례식장 기준 — 시설면적 150㎡당 1대';
-  } else if(type === 'welfare' || type === 'education' || type === 'hazard' || type === 'auto' || type === 'animal' || type === 'recycling' || type === 'correction' || type === 'broadcast' || type === 'cemetery' || type === 'tourist' || type === 'camping'){
-    divisor = 300;
-    basis = '노유자시설·교육연구시설·위험물저장및처리시설·자동차관련시설 등 기준(주차장법 시행령 별표1 "그 밖의 건축물") — 시설면적 300㎡당 1대';
-  } else if(type === 'amuse'){
-    divisor = 100;
-    basis = '위락시설 기준 — 시설면적 100㎡당 1대';
-  } else {
-    return null;
-  }
-  return {
-    count: area / divisor,
-    basis,
-    note: '주차장법 시행령 별표1의 <b>국가 최소기준</b>입니다. 특별시·광역시·시·군 조례로 시설 종류를 세분하거나 기준을 강화할 수 있어, 정확한 수치는 관할 지자체에 확인하세요.'
-  };
 }
 
 // title block date
