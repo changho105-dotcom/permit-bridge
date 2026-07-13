@@ -5529,7 +5529,9 @@ addrSearchBtn.addEventListener('click', async () => {
     }
     html += '<div style="font-size:14px; line-height:1.8; margin-top:10px;">';
     html += '📍 ' + first.sido + ' ' + first.sigg + '<br>';
-    html += '🏷️ 용도지역: <b>' + (zoneConsistent ? first.uname : unames.join(' / ') + ' (필지마다 다름)') + '</b><br>';
+    html += '🏷️ 용도지역: <b>' + (zoneConsistent ? first.uname : unames.join(' / ') + ' (필지마다 다름)') + '</b>' +
+      (combinedRisks.length > 0 ? ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">· ' + combinedRisks.map(r => r.label).join(', ') + '</span>' : '') +
+      '<br>';
     html += '📐 합산 대지면적: <b>' + totalArea.toFixed(2) + ' ㎡</b>' + (missingAreaCount > 0 ? ' <span style="color:var(--warn);">(' + missingAreaCount + '개 필지 면적 미확인 — 실제보다 작게 계산됨)</span>' : '');
     html += '</div></div>';
 
