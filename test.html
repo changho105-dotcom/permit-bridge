@@ -5625,54 +5625,71 @@ fcUseTypeSel.addEventListener('change', ()=>{
 // "이 앱에서 선택 가능"으로 처리 — 조례로 오히려 금지될 수 있다는 점은 여전히 확인 필요(관할 구청).
 // 반대로 "법령상 전면 금지"(조례로도 못 풀어줌) 항목만 선택지에서 뺌. 위락시설·숙박시설처럼
 // "주거지역과 차단되거나 조례가 정한 거리 밖이면 허용"류의 거리조건부 항목은 이 앱이 거리를 계산할
-// 수 없어 원칙적으로 제외하되, 기존에 이미 노출돼 있던 상업지역 위락시설(중심·일반상업)은 하위호환
-// 유지. 발전시설·방송통신시설·교정및군사시설·자원순환관련시설·동물및식물관련시설·위험물저장및처리
-// 시설·공장·창고시설·자동차관련시설·묘지관련시설·관광휴게시설·장례시설·야영장시설은 이 앱의 목표
-// 사용자(개인 건축주·소규모 개발)가 사실상 선택하지 않는 인프라/산업 카테고리라 목록에서 제외(별표
-// 원문엔 존재함, 필요시 추후 추가 가능).
+// 수 없어 원칙적으로 제외하되, 기존에 이미 노출돼 있던 상업지역 위락시설(중심·일반상업)은 하위호환 유지.
+// ⚠️ 2026-07-11 추가 수정: 애초에 발전시설·방송통신시설·교정및군사시설·자원순환관련시설·동물및식물
+// 관련시설·위험물저장및처리시설·공장·창고시설·자동차관련시설·묘지관련시설·관광휴게시설·장례시설·
+// 야영장시설 13개를 "개인 건축주가 사실상 선택 안 할 인프라/산업 카테고리"로 임의 판단해 통째로
+// 뺐었으나, Kevin이 실제 사례(중화동 305-42, 준주거지역, 현장에 주유소=위험물저장및처리시설 존재)로
+// 이 판단이 틀렸음을 증명함 — "모든 것을 표현해"를 어기고 자체 필터를 씌운 게 원인. 같은 실수가
+// 다른 카테고리에서도 재발하지 않도록 13개 전부 별표 원문 기준으로 추가함(danok/house 포함 총 29종,
+// 별표1의 전체 용도 분류와 1:1 대응).
 const ZONE_ALLOWED_USES = {
   // 별표2 [별표 2] <개정 2014.3.24> — 다가구주택은 danok 아닌 house 쪽 취급(조례로만 허용되는
-  // 별도 항목이라 순수 단독주택과 조건이 다름), 근생1종은 1,000㎡ 미만·특정업종만(narrow)
-  "제1종전용주거지역": ["danok","house","neighbor1","religion","culture","education","welfare"],
-  // 별표3 <개정 2014.1.14> — 공동주택(아파트 포함) 전체가 법령상 항상 허용되는 유일한 주거지역
-  "제2종전용주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","education","welfare"],
-  // 별표4 <개정 2018.1.16> — 아파트 제외(HOUSE_APARTMENT_EXCLUDED_ZONES 참고), 판매·업무는 narrow
-  "제1종일반주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","medical","education","welfare","training","sports","business"],
-  // 별표5 <개정 2021.7.6> — 아파트 제외
-  "제2종일반주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","medical","education","welfare","training","sports","business"],
-  // 별표6 <개정 2021.7.6> — 3종은 아파트도 법령상 허용(고층아파트 단지가 주로 3종인 이유), 업무시설 narrow 제한 없음(3천㎡ 이하 전체)
-  "제3종일반주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","medical","education","welfare","training","sports","business"],
-  // 별표7 <개정 2012.4.10> — 공동주택 전체 법령상 허용(아파트 제외 없음), 판매·운수·업무 narrow 제한 없음(전체 허용). 위락·숙박시설은 언급 자체가 없어 전면 금지
-  "준주거지역": ["danok","house","neighbor1","neighbor2","religion","medical","education","welfare","training","sports","culture","sales","transport","business"],
-  // 별표8(2025.1.21) — 단독주택은 복합용도 아니면 법령상 금지라 danok 미포함. 숙박시설은 주거지역과 거리조건부라 미포함
-  "중심상업지역": ["house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","amuse"],
-  // 별표9 — 단독주택은 조례로만 금지 가능(기본 허용)이라 danok 포함
-  "일반상업지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","amuse"],
-  // 별표10 — 단독주택 제한 조항 자체가 없어 danok 포함, 위락시설은 원칙금지라 미포함
-  "근린상업지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business"],
-  // 별표11 — 주택(단독+공동)·의료시설 전면 금지, 예외 없음(상업지역 4개 중 유일)
-  "유통상업지역": ["neighbor2","culture","religion","sales","transport","education","welfare","training","sports","business"],
-  // 별표12 — 주택은 기숙사만 조례허용(이 앱 용도구분에 없어 미반영), 단독·아파트류 불가. 공업지역 3개 중 가장 좁음
-  "전용공업지역": ["neighbor1","neighbor2","culture","sales","transport","medical","education","welfare"],
-  // 별표13 — 단독주택은 조례허용, 공동주택은 기숙사만 가능해 house 제외
-  "일반공업지역": ["danok","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","business"],
-  // 별표14 — 공업지역 3개 중 유일하게 공동주택(아파트 포함)이 조례로 안 막으면 기본 허용(영등포·성수동 등 실제 아파트 많음). 위락시설만 법령상 전면 금지
-  "준공업지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","lodging"],
-  // 별표15 — 전체 건축물 4층 이하 원칙. 공동주택 완전 금지, 단독주택(다가구 제외)만 조례 허용
-  "보전녹지지역": ["danok","neighbor1","neighbor2","culture","religion","medical","education","welfare"],
-  // 별표16 — 전체 4층 이하. 공동주택(아파트 제외)도 조례로 허용. 종교시설·업무시설 언급 없어 미포함
-  "생산녹지지역": ["danok","house","neighbor1","neighbor2","culture","sales","medical","education","welfare","training","sports"],
-  // 별표17(2025.10.1) — 전체 4층 이하. 아파트 제외. 숙박은 관광지 내 한정(narrow)이지만 포함
-  "자연녹지지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","lodging"],
-  // 별표18 — 전체 4층 이하. 공동주택 완전 금지(보전녹지와 동일 패턴)
-  "보전관리지역": ["danok","neighbor1","neighbor2","religion","medical","education","welfare"],
-  // 별표19 — 전체 4층 이하. 아파트 제외. 종교·업무·운수시설 언급 없어 미포함
-  "생산관리지역": ["danok","house","neighbor1","neighbor2","sales","medical","education","welfare","training","sports"],
-  // 별표20(2024.1.26) — 4층 초과 전면 금지. 아파트만 금지(연립·다세대는 조례가 안 막으면 허용)
-  "계획관리지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","lodging"],
+  // 별도 항목이라 순수 단독주택과 조건이 다름), 근생1종은 1,000㎡ 미만·특정업종만(narrow). 자동차관련은 주차장만(narrow)
+  "제1종전용주거지역": ["danok","house","neighbor1","religion","culture","education","welfare","auto"],
+  // 별표3 <개정 2014.1.14> — 공동주택(아파트 포함) 전체가 법령상 항상 허용되는 유일한 주거지역. 자동차관련은 주차장만(narrow)
+  "제2종전용주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","education","welfare","auto"],
+  // 별표4 <개정 2018.1.16> — 아파트 제외(HOUSE_APARTMENT_EXCLUDED_ZONES 참고), 판매·업무는 narrow.
+  // 창고시설 전체허용, 위험물저장(narrow-주유소 등 대부분 포함, LPG/고압가스 일부만 제외), 자동차관련(narrow-주차장세차장),
+  // 수련시설엔 야영장 포함, 동물식물(narrow-온실만), 교정및군사·방송통신·발전시설은 전체 조례허용
+  "제1종일반주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","medical","education","welfare","training","sports","business","factory","warehouse","hazard","auto","animal","correction","broadcast","power","camping"],
+  // 별표5 <개정 2021.7.6> — 아파트 제외. 창고전체·위험물narrow·자동차narrow·동물식물narrow·교정군사·방송통신·발전·야영장 전부 명시
+  "제2종일반주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","medical","education","welfare","training","sports","business","factory","warehouse","hazard","auto","animal","correction","broadcast","power","camping"],
+  // 별표6 <개정 2021.7.6> — 3종은 아파트도 법령상 허용(고층아파트 단지가 주로 3종인 이유), 업무시설 narrow 제한 없음(3천㎡ 이하 전체). 나머지는 2종과 동일 패턴
+  "제3종일반주거지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","medical","education","welfare","training","sports","business","factory","warehouse","hazard","auto","animal","correction","broadcast","power","camping"],
+  // 별표7 <개정 2012.4.10> — 공동주택 전체 법령상 허용(아파트 제외 없음), 판매·운수·업무 narrow 제한 없음(전체 허용).
+  // 위험물저장·창고·자동차(폐차장제외)·동물식물(도축장도계장제외)·교정군사·방송통신·발전·관광휴게(narrow)·장례식장 전부 조례허용.
+  // 위락·숙박시설·야영장은 언급 자체가 없어 전면 금지 — Kevin 제보 중화동 305-42(주유소=hazard) 이 조항으로 해결됨
+  "준주거지역": ["danok","house","neighbor1","neighbor2","religion","medical","education","welfare","training","sports","culture","sales","transport","business","factory","warehouse","hazard","auto","animal","correction","broadcast","power","tourist","funeral"],
+  // 별표8(2025.1.21) — 단독주택은 복합용도 아니면 법령상 금지라 danok 미포함. 숙박시설은 주거지역과 거리조건부라 미포함.
+  // 공장narrow·창고전체·위험물narrow·자동차narrow·교정시설·관광휴게·장례·야영장 조례허용(동물식물·자원순환·묘지는 법령상 전면금지)
+  "중심상업지역": ["house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","amuse","factory","warehouse","hazard","auto","correction","tourist","funeral","camping"],
+  // 별표9 — 단독주택은 조례로만 금지 가능(기본 허용)이라 danok 포함. 공장narrow·위험물narrow·자동차narrow·동물식물narrow·교정·야영장 조례허용(창고 언급 없음)
+  "일반상업지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","amuse","factory","hazard","auto","animal","correction","camping"],
+  // 별표10 — 단독주택 제한 조항 자체가 없어 danok 포함, 위락시설은 원칙금지라 미포함.
+  // 공장narrow·창고전체·위험물narrow·자동차narrow·동물식물narrow·교정군사·발전·관광휴게 조례허용
+  "근린상업지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","factory","warehouse","hazard","auto","animal","correction","power","tourist"],
+  // 별표11 — 주택(단독+공동)·의료시설·공장 전면 금지, 예외 없음(상업지역 4개 중 유일).
+  // 위험물narrow·자동차(주차장세차장은 법령상 항상허용, 나머지 조례허용)·교정군사·방송통신·발전·관광휴게·장례·야영장 조례허용
+  "유통상업지역": ["neighbor2","culture","religion","sales","transport","education","welfare","training","sports","business","hazard","auto","correction","broadcast","power","tourist","funeral","camping"],
+  // 별표12 — 주택은 기숙사만 조례허용(이 앱 용도구분에 없어 미반영), 단독·아파트류 불가. 공업지역 3개 중 가장 좁음.
+  // 공장·창고·위험물저장·자동차관련·자원순환·발전시설은 오히려 법령상 항상허용(공업지역 핵심용도라 당연), 교정군사·방송통신은 조례허용
+  "전용공업지역": ["neighbor1","neighbor2","culture","sales","transport","medical","education","welfare","factory","warehouse","hazard","auto","recycling","power","correction","broadcast"],
+  // 별표13 — 단독주택은 조례허용, 공동주택은 기숙사만 가능해 house 제외. 공장·창고·위험물·자동차·자원순환·발전 법령상 항상허용, 동물식물·교정군사·방송통신·장례·야영장 조례허용
+  "일반공업지역": ["danok","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","business","factory","warehouse","hazard","auto","recycling","power","animal","correction","broadcast","funeral","camping"],
+  // 별표14 — 공업지역 3개 중 유일하게 공동주택(아파트 포함)이 조례로 안 막으면 기본 허용(영등포·성수동 등 실제 아파트 많음).
+  // 위락시설만 법령상 전면 금지, 나머지(공장narrow·동물식물·교정군사·관광휴게 포함 창고·위험물·자동차·자원순환·방송통신·발전·장례·야영장까지)는 언급 없거나 조례허용=사실상 자유
+  "준공업지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","lodging","factory","warehouse","hazard","auto","recycling","animal","correction","broadcast","power","tourist","funeral","camping"],
+  // 별표15 — 전체 건축물 4층 이하 원칙. 공동주택 완전 금지, 단독주택(다가구 제외)만 조례 허용.
+  // 창고narrow(농임축수산업용만)·교정군사 법령상허용, 위험물narrow·동물식물narrow·묘지·장례·야영장 조례허용
+  "보전녹지지역": ["danok","neighbor1","neighbor2","culture","religion","medical","education","welfare","warehouse","correction","hazard","animal","cemetery","funeral","camping"],
+  // 별표16 — 전체 4층 이하. 공동주택(아파트 제외)도 조례로 허용. 종교시설·업무시설 언급 없어 미포함.
+  // 창고narrow·위험물narrow·동물식물narrow·교정군사·방송통신·발전·야영장 법령상허용, 공장narrow·자동차narrow·자원순환·묘지·장례 조례허용
+  "생산녹지지역": ["danok","house","neighbor1","neighbor2","culture","sales","medical","education","welfare","training","sports","warehouse","hazard","animal","correction","broadcast","power","camping","factory","auto","recycling","cemetery","funeral"],
+  // 별표17(2025.10.1) — 전체 4층 이하. 아파트 제외. 숙박은 관광지 내 한정(narrow)이지만 포함.
+  // 창고narrow·동물식물·자원순환·교정군사·방송통신·발전·묘지·관광휴게·장례·야영장 법령상허용, 공장narrow·위험물·자동차관련 조례허용
+  "자연녹지지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","lodging","warehouse","animal","recycling","correction","broadcast","power","cemetery","tourist","funeral","camping","factory","hazard","auto"],
+  // 별표18 — 전체 4층 이하. 공동주택 완전 금지(보전녹지와 동일 패턴). 교정군사 법령상허용, 창고narrow·위험물·동물식물narrow·방송통신·발전·묘지·장례·야영장 조례허용
+  "보전관리지역": ["danok","neighbor1","neighbor2","religion","medical","education","welfare","correction","warehouse","hazard","animal","broadcast","power","cemetery","funeral","camping"],
+  // 별표19 — 전체 4층 이하. 아파트 제외. 종교·업무·운수시설 언급 없어 미포함.
+  // 창고narrow·동물식물narrow·교정군사·발전 법령상허용, 공장narrow·위험물·자동차narrow·자원순환·방송통신·묘지·장례·야영장 조례허용
+  "생산관리지역": ["danok","house","neighbor1","neighbor2","sales","medical","education","welfare","training","sports","warehouse","animal","correction","power","factory","hazard","auto","recycling","broadcast","cemetery","funeral","camping"],
+  // 별표20(2024.1.26) — 4층 초과 전면 금지. 아파트만 금지(연립·다세대는 조례가 안 막으면 허용). 공장narrow·창고·위험물·자동차·관광휴게 조례허용
+  "계획관리지역": ["danok","house","neighbor1","neighbor2","culture","religion","sales","transport","medical","education","welfare","training","sports","business","lodging","factory","warehouse","hazard","auto","tourist"],
   // 별표21(2025.7.1) — 층수제한 조항 자체는 없음. 단독주택은 부지 1,000㎡ 미만만(narrow), 공동주택 전혀 없어 절대 불가.
+  // 창고narrow·발전 법령상허용, 위험물narrow·동물식물·자원순환·교정군사·방송통신·묘지·장례·야영장 조례허용
   // ⚠️ 비고: 농업진흥지역·보전산지·초지 해당 시 농지법·산지관리법·초지법이 우선 적용되어 이 앱이 확인 못하는 변수가 있음
-  "농림지역": ["danok","neighbor1","neighbor2","culture","religion","medical","training"],
+  "농림지역": ["danok","neighbor1","neighbor2","culture","religion","medical","training","warehouse","power","hazard","animal","recycling","correction","broadcast","cemetery","funeral","camping"],
   // 별표22(2025.7.1) — 단독주택도 농지법상 농어가주택만 가능(일반인 불가), 나머지도 전부 "조례가 수질오염·경관훼손
   // 우려 없다고 인정한 지역 내에서만"이라는 이중 불확정 조건 — 확정 가능한 일반 용도가 없어 비움(기존과 동일 원칙 유지)
   "자연환경보전지역": [],
@@ -5693,6 +5710,19 @@ const USE_TYPE_LABELS = {
   sports: "운동시설",
   business: "업무시설 (오피스텔 제외)",
   lodging: "숙박시설",
+  factory: "공장",
+  warehouse: "창고시설",
+  hazard: "위험물저장 및 처리시설 (주유소 등)",
+  auto: "자동차관련시설",
+  animal: "동물 및 식물관련시설",
+  recycling: "자원순환 관련시설",
+  correction: "교정 및 군사시설",
+  broadcast: "방송통신시설",
+  power: "발전시설",
+  cemetery: "묘지관련시설",
+  tourist: "관광휴게시설",
+  funeral: "장례시설",
+  camping: "야영장시설",
   amuse: "위락시설",
 };
 
@@ -6098,9 +6128,18 @@ function computeParking(type, area, units, unitSize){
   } else if(type === 'training'){
     divisor = 350;
     basis = '수련시설 기준 — 시설면적 350㎡당 1대';
-  } else if(type === 'welfare' || type === 'education'){
+  } else if(type === 'factory' || type === 'power'){
+    divisor = 350;
+    basis = '공장(아파트형 제외)·발전시설 기준 — 시설면적 350㎡당 1대';
+  } else if(type === 'warehouse'){
+    divisor = 400;
+    basis = '창고시설 기준 — 시설면적 400㎡당 1대';
+  } else if(type === 'funeral'){
+    divisor = 150;
+    basis = '장례식장 기준 — 시설면적 150㎡당 1대';
+  } else if(type === 'welfare' || type === 'education' || type === 'hazard' || type === 'auto' || type === 'animal' || type === 'recycling' || type === 'correction' || type === 'broadcast' || type === 'cemetery' || type === 'tourist' || type === 'camping'){
     divisor = 300;
-    basis = '노유자시설·교육연구시설 기준(주차장법 시행령 별표1 "그 밖의 건축물") — 시설면적 300㎡당 1대';
+    basis = '노유자시설·교육연구시설·위험물저장및처리시설·자동차관련시설 등 기준(주차장법 시행령 별표1 "그 밖의 건축물") — 시설면적 300㎡당 1대';
   } else if(type === 'amuse'){
     divisor = 100;
     basis = '위락시설 기준 — 시설면적 100㎡당 1대';
