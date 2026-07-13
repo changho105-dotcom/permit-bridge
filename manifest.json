@@ -1,0 +1,29 @@
+{
+  "name": "인허가브릿지 - 법규 계산기",
+  "short_name": "인허가브릿지",
+  "description": "주소만 입력하면 용도지역·건폐율·용적률·건축 규제를 자동으로 확인하는 무료 법규 사전검토 도구",
+  "start_url": "./법규계산기.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FAF6EE",
+  "theme_color": "#14315C",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
