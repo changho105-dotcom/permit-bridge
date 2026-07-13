@@ -460,6 +460,14 @@
 
 </div>
 
+<div id="infoModal" style="display:none; position:fixed; inset:0; background:rgba(11,30,56,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#fff; max-width:520px; width:100%; max-height:80vh; overflow-y:auto; border-radius:12px; padding:28px; position:relative;">
+    <button id="infoModalCloseBtn" style="position:absolute; top:16px; right:16px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink);">✕</button>
+    <h3 id="infoModalTitle" style="margin-top:0;"></h3>
+    <p id="infoModalBody" style="font-size:13.5px; line-height:1.7; color:var(--ink);"></p>
+  </div>
+</div>
+
 <script>
 /*
   ===========================================================
@@ -5598,16 +5606,29 @@ function flagInvalid(inputEl) {
   setTimeout(() => { inputEl.style.borderColor = ''; inputEl.style.boxShadow = ''; }, 1800);
 }
 
+// HTML 속성(data-*)에 안전하게 넣기 위한 이스케이프 — authority 텍스트에 큰따옴표("계산 불가"
+// 등)가 포함돼 있어 그대로 넣으면 속성이 깨짐
+function escapeHtmlAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // 지역·지구 리스크 1건을 체크리스트 항목 HTML로 렌더링. r.label(중분류 — 이 앱이 붙인 표준 명칭)만
 // 보여주면 VWorld 원문의 더 구체적인 소분류 정보(예: "비행안전제3구역(전술)"처럼 구역 번호·유형까지
 // 포함된 표기)가 사라져 사용자가 손해를 봄 — r.raw(VWorld prposAreaDstrcCodeNm 원문)가 label과
 // 다르면 함께 보여줌(2026-07-11 Kevin 피드백: "대분류로만 모이는데 중분류·소분류도 표현해").
+// authority 전문은 길어서(특히 지구단위계획구역) 목록에 전부 나열하면 가독성이 떨어져, "관할 OOO"
+// 소관기관만 요약으로 보여주고 나머지 상세설명은 "자세히" 링크 클릭 시 팝업으로 분리
+// (2026-07-11 Kevin: "참고사항과 그 아래 항목들에 링크를 넣고 팝업으로 추가 설명을 넣자").
 function renderRiskItem(r, authorityPrefix) {
   const rawHtml = (r.raw && r.raw !== r.label)
     ? ' <span style="font-size:12.5px; font-weight:400; color:var(--text-muted);">— ' + r.raw + '</span>'
     : '';
+  const parenIdx = r.authority.indexOf('(');
+  const summary = parenIdx > 0 ? r.authority.slice(0, parenIdx).trim() : r.authority;
+  const fullBody = (authorityPrefix || '') + r.authority;
   return '<div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);"><b>' + r.label + '</b>' + rawHtml +
-    '<br><span style="font-size:12.5px; color:var(--text-muted);">' + (authorityPrefix || '') + r.authority + '</span></div>';
+    '<br><span style="font-size:12.5px; color:var(--text-muted);">' + (authorityPrefix || '') + summary + '</span> ' +
+    '<a href="#" class="riskInfoLink" data-title="' + escapeHtmlAttr(r.label) + '" data-body="' + escapeHtmlAttr(fullBody) + '" style="font-size:12.5px; text-decoration:underline; white-space:nowrap;">자세히</a></div>';
 }
 
 const fcUseTypeSel = document.getElementById('fcUseType');
@@ -5816,7 +5837,9 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     // 공장설립승인지역·과밀억제권역·토지거래허가구역까지 5건이 더 감지되는데 전부 화면에서 사라졌었음).
     if (advisoryRisks.length > 0) {
       const advisoryHtml = advisoryRisks.map(r => renderRiskItem(r)).join('');
-      html += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항입니다:<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
+      html += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항입니다 ' +
+        '<a href="#" class="riskInfoLink" data-title="참고사항이란?" data-body="' + escapeHtmlAttr('위 건폐율·용적률 계산과는 별개로, 이 부지에 추가로 지정된 지역·지구입니다. 대부분 특정 용도(공장·가축시설 등)로 짓거나, 매매할 때만 관련되는 절차라서 일반적인 건축 계산 자체를 막지는 않습니다. 다만 실제로 그 용도로 짓거나 거래하실 계획이라면 아래 각 항목의 소관기관에 미리 확인하는 것이 안전합니다.') + '" style="font-size:12.5px; text-decoration:underline;">자세히</a>' +
+        ':<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
     }
     html += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     noteEl.innerHTML = html;
@@ -5896,7 +5919,9 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     noteEl.innerHTML += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     if (advisoryRisks.length > 0) {
       const advisoryHtml = advisoryRisks.map(r => renderRiskItem(r)).join('');
-      noteEl.innerHTML += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항이라 위 건폐율/용적률 계산은 그대로 유효하지만, 해당 용도라면 미리 확인하세요:<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
+      noteEl.innerHTML += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항이라 위 건폐율/용적률 계산은 그대로 유효하지만, 해당 용도라면 미리 확인하세요 ' +
+        '<a href="#" class="riskInfoLink" data-title="참고사항이란?" data-body="' + escapeHtmlAttr('위 건폐율·용적률 계산과는 별개로, 이 부지에 추가로 지정된 지역·지구입니다. 대부분 특정 용도(공장·가축시설 등)로 짓거나, 매매할 때만 관련되는 절차라서 일반적인 건축 계산 자체를 막지는 않습니다. 다만 실제로 그 용도로 짓거나 거래하실 계획이라면 아래 각 항목의 소관기관에 미리 확인하는 것이 안전합니다.') + '" style="font-size:12.5px; text-decoration:underline;">자세히</a>' +
+        ':<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
     }
   } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
     // 지역지구 조회 자체가 실패한 경우 — 아래 건폐율/용적률 숫자는 국토계획법 기준으로는 유효하지만,
@@ -6219,6 +6244,31 @@ document.getElementById('privacyCloseBtn').addEventListener('click', () => {
 });
 privacyModal.addEventListener('click', (e) => {
   if (e.target === privacyModal) privacyModal.style.display = 'none'; // 배경 클릭 시 닫기
+});
+
+// 지역·지구 항목 상세설명 팝업 (2026-07-11 Kevin: "참고사항과 그 아래 항목들에 링크를 넣고 팝업으로
+// 추가 설명을 넣자" — authority 텍스트가 길어지면서(특히 지구단위계획구역) 인라인으로 전부 보여주면
+// 목록이 너무 길어 가독성이 떨어짐. 요약은 그대로 두고 상세 설명만 팝업으로 분리)
+const infoModal = document.getElementById('infoModal');
+const infoModalTitle = document.getElementById('infoModalTitle');
+const infoModalBody = document.getElementById('infoModalBody');
+function showInfoModal(title, bodyHtml) {
+  infoModalTitle.textContent = title;
+  infoModalBody.innerHTML = bodyHtml;
+  infoModal.style.display = 'flex';
+}
+document.getElementById('infoModalCloseBtn').addEventListener('click', () => {
+  infoModal.style.display = 'none';
+});
+infoModal.addEventListener('click', (e) => {
+  if (e.target === infoModal) infoModal.style.display = 'none';
+});
+// note-box 안의 "자세히" 링크는 매번 innerHTML로 새로 그려지므로 개별 리스너 대신 이벤트 위임 사용
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('.riskInfoLink');
+  if (!link) return;
+  e.preventDefault();
+  showInfoModal(link.dataset.title, link.dataset.body);
 });
 </script>
 </body>
