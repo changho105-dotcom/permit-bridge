@@ -5320,8 +5320,31 @@ async function lookupParcel(addr) {
 
   const overlayRisks = await lookupOverlayRisks(item.id, addr);
   const boundary = await lookupParcelBoundary(item.id, addr);
+  const landPrice = await lookupLandPrice(item.id, addr);
 
-  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary };
+  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary, landPrice };
+}
+
+// 개별공시지가 — VWorld 국가중점데이터(NED) getIndvdLandPriceAttr API. 기존 VWORLD_KEY 그대로 사용
+// 가능(별도 활용신청 불필요, 2026-07-21 확인). 응답에 연도별 이력이 전부 들어있어 가장 최근 연도(stdrYear
+// 최댓값)만 골라서 반환. 공시일 기준 확정 발표된 공식 수치라 "확실한 것만 보여준다" 원칙에 부합함
+async function lookupLandPrice(pnu, addr) {
+  const url = 'https://api.vworld.kr/ned/data/getIndvdLandPriceAttr'
+    + '?pnu=' + pnu + '&format=json&numOfRows=50&pageNo=1'
+    + '&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
+  try {
+    const data = await vworldRequest(url);
+    showDebug('⑥ 개별공시지가 조회 결과: ' + addr, data);
+    const list = data && data.indvdLandPrices && data.indvdLandPrices.field;
+    if (!list || list.length === 0) return null;
+    const latest = list.reduce((a, b) => (parseInt(b.stdrYear) > parseInt(a.stdrYear) ? b : a));
+    const price = parseInt(latest.pblntfPclnd);
+    if (!price) return null;
+    return { pricePerM2: price, year: latest.stdrYear, baseDate: latest.pblntfDe };
+  } catch (e) {
+    showDebug('⑥ 개별공시지가 조회 실패: ' + addr, e.message);
+    return null;
+  }
 }
 
 // 필지 경계선(연속지적도) — VWorld data API의 LP_PA_CBND_BUBUN 데이터셋을 PNU로 필터링해서 조회.
@@ -5717,6 +5740,11 @@ addrSearchBtn.addEventListener('click', async () => {
       (combinedRisks.length > 0 ? ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">· ' + combinedRisks.map(r => r.label).join(', ') + '</span>' : '') +
       '<br>';
     html += '📐 합산 대지면적: <b>' + totalArea.toFixed(2) + ' ㎡</b>' + (missingAreaCount > 0 ? ' <span style="color:var(--warn);">(' + missingAreaCount + '개 필지 면적 미확인 — 실제보다 작게 계산됨)</span>' : '');
+    // 필지 여러 개(합필)여도 공시지가는 첫 번째 필지 기준으로만 표시(필지마다 값이 달라 합산이 애매해서 단순화)
+    if (first.landPrice) {
+      html += '<br>📊 개별공시지가: <b>' + first.landPrice.pricePerM2.toLocaleString('ko-KR') + '원/㎡</b>' +
+        ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">(' + first.landPrice.year + '년 기준' + (addrs.length > 1 ? ', 첫 필지 기준' : '') + ')</span>';
+    }
     html += '</div>';
     // 필지 여러 개(합필)여도 지도는 첫 번째 필지 위치만 표시(단순화) — 좌표가 없으면(검색 API 응답에 point 누락 등) 조용히 생략
     if (first.x && first.y) {
