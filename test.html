@@ -5482,8 +5482,17 @@ async function lookupOverlayRisks(pnu, addr){
 // (내부에서 initPosition.zoom을 바로 읽어서, 빠뜨리면 생성자가 중간에 에러로 멈추고 지도가 빈 채로 남음 —
 // vw.ol3.CameraPosition 객체를 콘솔에서 직접 찍어보고 {center, zoom, rotation} 구조인 걸 확인해서 구성함).
 // 지도 API 스크립트 로드 실패(네트워크, 도메인 미등록 등) 시에도 나머지 기능(법규 계산)은 정상 작동해야
-// 하므로 전부 try/catch로 감싸고 실패하면 조용히 건너뜀
+// 하므로 전부 try/catch로 감싸고 실패하면 조용히 건너뜀.
+// 같은 컨테이너(vmap/vmapModal)에 새 지도를 만들기 전, 이전 인스턴스를 setTarget(null)로 DOM 연결을
+// 끊어줘야 함 — 안 끊으면 검색을 여러 번 하거나 지도 모달을 여러 번 여닫을 때 내부 상태가 꼬여서
+// 초기화가 중간에 실패하고(zoom을 못 읽는 에러), 화면엔 확대/축소가 안 된 기본 지도(전 세계 축소본,
+// "한국 지도 전체"처럼 보임)만 남는 문제가 실제로 재현됨(2026-07-21)
+const parcelMapInstances = {};
 function renderParcelMap(containerId, x, y, boundary) {
+  if (parcelMapInstances[containerId]) {
+    try { parcelMapInstances[containerId].setTarget(null); } catch (e) {}
+    parcelMapInstances[containerId] = null;
+  }
   try {
     if (typeof vw === 'undefined' || !vw.ol3 || typeof ol === 'undefined') return null;
     const center = ol.proj.transform([parseFloat(x), parseFloat(y)], 'EPSG:4326', 'EPSG:900913');
@@ -5540,6 +5549,7 @@ function renderParcelMap(containerId, x, y, boundary) {
         if (map.renderSync) map.renderSync();
       }
     }, 0);
+    parcelMapInstances[containerId] = map;
     return map;
   } catch (e) {
     showDebug('지도 표시 실패(' + containerId + ')', e.message);
