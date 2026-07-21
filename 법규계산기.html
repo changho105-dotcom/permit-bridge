@@ -5300,8 +5300,32 @@ async function lookupParcel(addr) {
   }
 
   const overlayRisks = await lookupOverlayRisks(item.id, addr);
+  const boundary = await lookupParcelBoundary(item.id, addr);
 
-  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y };
+  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary };
+}
+
+// 필지 경계선(연속지적도) — VWorld data API의 LP_PA_CBND_BUBUN 데이터셋을 PNU로 필터링해서 조회.
+// 실패해도(예: 미공개 지역, API 일시 오류) 지도에 위치 마커만 표시하면 되므로 null 반환하고 조용히 넘어감
+async function lookupParcelBoundary(pnu, addr) {
+  const url = 'https://api.vworld.kr/req/data'
+    + '?service=data&request=GetFeature&data=LP_PA_CBND_BUBUN'
+    + '&attrFilter=pnu:=:' + pnu
+    + '&format=json&geometry=true&crs=EPSG:4326'
+    + '&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
+  try {
+    const data = await vworldRequest(url);
+    showDebug('⑤ 필지 경계 조회 결과: ' + addr, data);
+    const status = data && data.response && data.response.status;
+    const features = status === 'OK' && data.response.result.featureCollection.features;
+    if (features && features.length > 0 && features[0].geometry) {
+      return features[0].geometry; // GeoJSON geometry {type, coordinates}
+    }
+    return null;
+  } catch (e) {
+    showDebug('⑤ 필지 경계 조회 실패: ' + addr, e.message);
+    return null;
+  }
 }
 
 // 국토계획법 용도지역만으로는 확정할 수 없는 "다른 법령에 따른 지역·지구"(개발제한구역·농업진흥구역 등)를
@@ -5453,7 +5477,7 @@ async function lookupOverlayRisks(pnu, addr){
 // vw.ol3.CameraPosition 객체를 콘솔에서 직접 찍어보고 {center, zoom, rotation} 구조인 걸 확인해서 구성함).
 // 지도 API 스크립트 로드 실패(네트워크, 도메인 미등록 등) 시에도 나머지 기능(법규 계산)은 정상 작동해야
 // 하므로 전부 try/catch로 감싸고 실패하면 조용히 건너뜀
-function renderParcelMap(containerId, x, y) {
+function renderParcelMap(containerId, x, y, boundary) {
   try {
     if (typeof vw === 'undefined' || !vw.ol3 || typeof ol === 'undefined') return null;
     const center = ol.proj.transform([parseFloat(x), parseFloat(y)], 'EPSG:4326', 'EPSG:900913');
@@ -5473,13 +5497,43 @@ function renderParcelMap(containerId, x, y) {
         stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
       })
     }));
-    map.addLayer(new ol.layer.Vector({ source: new ol.source.Vector({ features: [marker] }) }));
+    const features = [marker];
+
+    // 필지 경계선(연속지적도) — 조회에 성공한 경우에만 폴리곤 표시. GeoJSON은 위경도(EPSG:4326)로
+    // 오므로 지도 좌표계(EPSG:900913)로 변환해서 읽어야 함(featureProjection 옵션이 이 변환을 대신 해줌)
+    let boundaryExtent = null;
+    if (boundary) {
+      try {
+        const geoJsonFormat = new ol.format.GeoJSON();
+        const boundaryFeature = geoJsonFormat.readFeature(
+          { type: 'Feature', geometry: boundary, properties: {} },
+          { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:900913' }
+        );
+        boundaryFeature.setStyle(new ol.style.Style({
+          fill: new ol.style.Fill({ color: 'rgba(217,98,43,0.18)' }),
+          stroke: new ol.style.Stroke({ color: '#D9622B', width: 2.5 })
+        }));
+        features.push(boundaryFeature);
+        boundaryExtent = boundaryFeature.getGeometry().getExtent();
+      } catch (e) {
+        showDebug('필지 경계 그리기 실패(' + containerId + ')', e.message);
+      }
+    }
+    map.addLayer(new ol.layer.Vector({ source: new ol.source.Vector({ features: features }) }));
+
     // innerHTML로 막 삽입된 컨테이너는 아직 레이아웃(reflow)이 안 끝난 상태라 캔버스가 실제 크기 대신
     // 브라우저 canvas 기본값(300x150)으로 그려지는 문제가 있음. updateSize()는 내부 크기 값(getSize())만
     // 갱신할 뿐 <canvas> DOM 크기는 안 바꿔서 효과가 없었고, renderSync()로 강제로 다시 그려야 실제
     // 캔버스 크기가 맞춰짐(실 브라우저 테스트로 확인, 2026-07-21). requestAnimationFrame은 브라우저가
     // 백그라운드 탭 상태면 실행이 안/늦게 되는 경우가 있어(테스트로 확인) setTimeout(0)이 더 안전함
-    if (map.renderSync) setTimeout(() => map.renderSync(), 0);
+    setTimeout(() => {
+      if (map.renderSync) map.renderSync();
+      // 필지 경계를 알면 그 전체가 화면에 들어오도록 확대/축소, 모르면 기존처럼 줌 18 고정
+      if (boundaryExtent && map.getView) {
+        map.getView().fit(boundaryExtent, { padding: [30, 30, 30, 30], maxZoom: 19 });
+        if (map.renderSync) map.renderSync();
+      }
+    }, 0);
     return map;
   } catch (e) {
     showDebug('지도 표시 실패(' + containerId + ')', e.message);
@@ -5487,12 +5541,12 @@ function renderParcelMap(containerId, x, y) {
   }
 }
 
-function openMapModal(x, y) {
+function openMapModal(x, y, boundary) {
   try {
     document.getElementById('mapModalOverlay').classList.add('open');
     // 모달은 열 때마다 컨테이너를 비우고 새로 그림(인스턴스 재사용보다 단순, 자주 여닫는 UI가 아니라 성능 부담 적음)
     document.getElementById('vmapModal').innerHTML = '';
-    const map = renderParcelMap('vmapModal', x, y);
+    const map = renderParcelMap('vmapModal', x, y, boundary);
     setTimeout(() => { if (map && map.renderSync) map.renderSync(); }, 100);
   } catch (e) {
     showDebug('지도 모달 열기 실패', e.message);
@@ -5669,9 +5723,9 @@ addrSearchBtn.addEventListener('click', async () => {
     addrResultBox.style.display = 'block';
     addrResultBox.innerHTML = html;
     if (first.x && first.y) {
-      renderParcelMap('vmap', first.x, first.y);
+      renderParcelMap('vmap', first.x, first.y, first.boundary);
       const wrapEl = document.getElementById('parcelMapWrap');
-      if (wrapEl) wrapEl.addEventListener('click', () => openMapModal(first.x, first.y));
+      if (wrapEl) wrapEl.addEventListener('click', () => openMapModal(first.x, first.y, first.boundary));
     }
 
     // 지역/용도지역/대지면적 자동 반영
