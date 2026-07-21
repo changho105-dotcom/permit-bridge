@@ -5130,6 +5130,8 @@ const GYEONGGI = {
 // 키는 메모리 변수로만 보관 (localStorage 미사용)
 const VWORLD_KEY = "4D1732B7-C9D9-3D0B-8651-486A30737F98";
 const VWORLD_DOMAIN = "changho105-dotcom.github.io"; // 신청 시 등록한 서비스URL의 호스트값 — 실제 배포 도메인과 반드시 일치해야 함 (2026-07-10 GitHub Pages 배포하며 github.com→실제 도메인으로 수정)
+// 공공데이터포털(data.go.kr) 공통 인증키 — 계정당 하나, 활용신청한 여러 API에 재사용됨(국가법령정보 API에서도 이미 쓰던 값)
+const DATA_GO_KR_KEY = "bb29c261a56b69e0891bfb34ead6f65bb2634ecab5972828171089cfcab8c442";
 
 // ---------- 조회내역 구글시트 자동 기록 ----------
 // Kevin이 만든 Google Apps Script 웹앱(2026-07-11 배포) — 본인 시트에만 append하는 doPost() 엔드포인트
@@ -5315,8 +5317,55 @@ async function lookupParcel(addr) {
   const overlayRisks = await lookupOverlayRisks(item.id, addr);
   const boundary = await lookupParcelBoundary(item.id, addr);
   const landPrice = await lookupLandPrice(item.id, addr);
+  const floorInfo = await lookupFloorInfo(item.id, addr);
 
-  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary, landPrice };
+  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary, landPrice, floorInfo };
+}
+
+// 기존 건축물 층별개요(현황) — 건축HUB(data.go.kr) getBrFlrOulnInfo API, 별도 인증키 신청함(DATA_GO_KR_KEY).
+// 나대지(빈 땅)에는 애초에 데이터가 없는 게 정상이라 그 경우 조용히 null 반환. 세대수 많은 대단지 아파트는
+// 층별 데이터가 수백 건이라 한 페이지(100건)로 다 못 가져올 수 있어 "최소 이 정도"로만 요약해서 보여줌
+async function lookupFloorInfo(pnu, addr) {
+  const sigunguCd = pnu.substring(0, 5);
+  const bjdongCd = pnu.substring(5, 10);
+  // VWorld PNU 11번째 자리(산여부): 1=일반대지, 2=산 → 건축HUB platGbCd: 0=대지, 1=산
+  const platGbCd = pnu.charAt(10) === '2' ? '1' : '0';
+  const bun = pnu.substring(11, 15);
+  const ji = pnu.substring(15, 19);
+  const url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrFlrOulnInfo'
+    + '?sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd + '&platGbCd=' + platGbCd
+    + '&bun=' + bun + '&ji=' + ji
+    + '&serviceKey=' + DATA_GO_KR_KEY + '&_type=json&numOfRows=100&pageNo=1';
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    showDebug('⑦ 층별개요 조회 결과: ' + addr, data);
+    const resultCode = data && data.response && data.response.header && data.response.header.resultCode;
+    if (resultCode !== '00') return null;
+    let items = data.response.body.items && data.response.body.items.item;
+    if (!items) return null;
+    if (!Array.isArray(items)) items = [items];
+    if (items.length === 0) return null;
+
+    const bldNm = (items[0].bldNm || '').trim() || null;
+    const groundFloors = items.filter(i => i.flrGbCdNm === '지상').map(i => parseInt(i.flrNo)).filter(n => !isNaN(n));
+    const undergroundFloors = items.filter(i => i.flrGbCdNm === '지하').map(i => parseInt(i.flrNo)).filter(n => !isNaN(n));
+    const purposeCounts = {};
+    items.forEach(i => { if (i.mainPurpsCdNm) purposeCounts[i.mainPurpsCdNm] = (purposeCounts[i.mainPurpsCdNm] || 0) + 1; });
+    const topPurpose = Object.entries(purposeCounts).sort((a, b) => b[1] - a[1])[0];
+    const totalCount = parseInt(data.response.body.totalCount) || items.length;
+
+    return {
+      bldNm,
+      maxGroundFloor: groundFloors.length > 0 ? Math.max(...groundFloors) : null,
+      maxUndergroundFloor: undergroundFloors.length > 0 ? Math.max(...undergroundFloors) : null,
+      mainPurpose: topPurpose ? topPurpose[0] : null,
+      approxOnly: totalCount > items.length // 페이지네이션으로 일부만 가져왔으면 "최소 N층"처럼 근사치임을 표시
+    };
+  } catch (e) {
+    showDebug('⑦ 층별개요 조회 실패: ' + addr, e.message);
+    return null;
+  }
 }
 
 // 개별공시지가 — VWorld 국가중점데이터(NED) getIndvdLandPriceAttr API. 기존 VWORLD_KEY 그대로 사용
@@ -5740,6 +5789,17 @@ addrSearchBtn.addEventListener('click', async () => {
         ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">(' + first.landPrice.year + '년 기준' + (addrs.length > 1 ? ', 첫 필지 기준' : '') + ')</span>';
     }
     html += '</div>';
+    // 기존 건축물이 있는 필지에만 나오는 정보(나대지는 조회 결과 자체가 없어 조용히 생략됨) — 첫 번째 필지 기준
+    if (first.floorInfo) {
+      const fi = first.floorInfo;
+      const floorParts = [];
+      if (fi.maxGroundFloor) floorParts.push('지상 ' + fi.maxGroundFloor + (fi.approxOnly ? '층 이상' : '층'));
+      if (fi.maxUndergroundFloor) floorParts.push('지하 ' + fi.maxUndergroundFloor + (fi.approxOnly ? '층 이상' : '층'));
+      html += '<div class="note-box">🏢 <b>기존 건축물이 있습니다</b>' + (fi.bldNm ? ' — ' + fi.bldNm : '') +
+        (floorParts.length > 0 ? ' (' + floorParts.join(' · ') + ')' : '') +
+        (fi.mainPurpose ? ', 주용도: ' + fi.mainPurpose : '') +
+        '<br><span style="font-size:12px; color:var(--text-muted);">건축물대장 층별개요 기준' + (fi.approxOnly ? ' · 세대수가 많아 일부 데이터만 조회됨' : '') + (addrs.length > 1 ? ' · 첫 필지 기준' : '') + '</span></div>';
+    }
     // 필지 여러 개(합필)여도 지도는 첫 번째 필지 위치만 표시(단순화) — 좌표가 없으면(검색 API 응답에 point 누락 등) 조용히 생략
     if (first.x && first.y) {
       html += '<div class="parcel-map-wrap" id="parcelMapWrap"><div id="vmap"></div><div class="mapExpandHint">🔍 눌러서 크게 보기</div></div>';
