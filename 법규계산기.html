@@ -18,6 +18,8 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<!-- VWorld 2D 지도 API — 검색결과 필지 위치 표시용. VWORLD_KEY/VWORLD_DOMAIN과 동일한 값(하단 JS 상수 근처 참고), <head>는 JS 실행 전이라 하드코딩 필요 -->
+<script type="text/javascript" src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=4D1732B7-C9D9-3D0B-8651-486A30737F98&domain=changho105-dotcom.github.io"></script>
 <style>
   :root{
     --ink:#14315C;
@@ -207,6 +209,42 @@
   @media (max-width:520px){ .result-grid{grid-template-columns:1fr;} }
   .result-grid-3{grid-template-columns:1fr 1fr 1fr;}
   @media (max-width:520px){ .result-grid-3{grid-template-columns:1fr;} }
+
+  /* 필지 위치 지도 — 데스크탑은 결과 카드 안에 바로 보여줌, 모바일은 작은 썸네일을 탭하면 전체화면으로 확대 */
+  .parcel-map-wrap{
+    position:relative;
+    width:100%;
+    height:320px;
+    margin-top:10px;
+    border:1.5px solid var(--paper-line-strong);
+    border-radius:8px;
+    overflow:hidden;
+    cursor:pointer;
+  }
+  .parcel-map-wrap #vmap{ width:100%; height:100%; }
+  .parcel-map-wrap .mapExpandHint{
+    position:absolute; right:8px; bottom:8px; z-index:5;
+    background:rgba(20,49,92,0.85); color:#fff; font-size:11.5px;
+    padding:4px 9px; border-radius:999px; pointer-events:none;
+  }
+  @media (max-width:520px){
+    .parcel-map-wrap{ height:140px; }
+  }
+  .mapModalOverlay{
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,0.55);
+  }
+  .mapModalOverlay.open{ display:block; }
+  .mapModalBox{
+    position:absolute; inset:0;
+    background:#fff;
+  }
+  .mapModalBox #vmapModal{ width:100%; height:100%; }
+  .mapModalCloseBtn{
+    position:absolute; top:10px; right:10px; z-index:10;
+    width:36px; height:36px; border-radius:50%; border:none;
+    background:var(--ink); color:#fff; font-size:18px; cursor:pointer;
+  }
   .result-card{
     border:1.5px solid var(--paper-line-strong);
     border-radius:8px;
@@ -443,6 +481,13 @@
     ·
     <a href="#" id="privacyBtn" style="color:inherit; text-decoration:underline;">개인정보처리방침</a>
   </footer>
+
+  <div class="mapModalOverlay" id="mapModalOverlay">
+    <div class="mapModalBox">
+      <button type="button" class="mapModalCloseBtn" id="mapModalCloseBtn">✕</button>
+      <div id="vmapModal"></div>
+    </div>
+  </div>
 </div>
 
 <div id="privacyModal" style="display:none; position:fixed; inset:0; background:rgba(11,30,56,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
@@ -5256,7 +5301,7 @@ async function lookupParcel(addr) {
 
   const overlayRisks = await lookupOverlayRisks(item.id, addr);
 
-  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks };
+  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y };
 }
 
 // 국토계획법 용도지역만으로는 확정할 수 없는 "다른 법령에 따른 지역·지구"(개발제한구역·농업진흥구역 등)를
@@ -5402,6 +5447,67 @@ async function lookupOverlayRisks(pnu, addr){
   }
 }
 
+// 필지 위치 지도 — VWorld 2D 지도 API(vw.ol3, OpenLayers 3 래퍼). 검색 API가 주는 좌표는 EPSG:4326(위경도)라
+// 지도 렌더링용 EPSG:900913(Web Mercator)로 변환 필요. mapOptions의 homePosition/initPosition은 필수값
+// (내부에서 initPosition.zoom을 바로 읽어서, 빠뜨리면 생성자가 중간에 에러로 멈추고 지도가 빈 채로 남음 —
+// vw.ol3.CameraPosition 객체를 콘솔에서 직접 찍어보고 {center, zoom, rotation} 구조인 걸 확인해서 구성함).
+// 지도 API 스크립트 로드 실패(네트워크, 도메인 미등록 등) 시에도 나머지 기능(법규 계산)은 정상 작동해야
+// 하므로 전부 try/catch로 감싸고 실패하면 조용히 건너뜀
+function renderParcelMap(containerId, x, y) {
+  try {
+    if (typeof vw === 'undefined' || !vw.ol3 || typeof ol === 'undefined') return null;
+    const center = ol.proj.transform([parseFloat(x), parseFloat(y)], 'EPSG:4326', 'EPSG:900913');
+    const map = new vw.ol3.Map(containerId, {
+      basemapType: vw.ol3.BasemapType.GRAPHIC,
+      controlDensity: vw.ol3.DensityType.EMPTY,
+      interactionDensity: vw.ol3.DensityType.BASIC,
+      controlsAutoArrange: true,
+      homePosition: { center: center, zoom: 18, rotation: 0 },
+      initPosition: { center: center, zoom: 18, rotation: 0 }
+    });
+    const marker = new ol.Feature({ geometry: new ol.geom.Point(center) });
+    marker.setStyle(new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 8,
+        fill: new ol.style.Fill({ color: '#D9622B' }),
+        stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+      })
+    }));
+    map.addLayer(new ol.layer.Vector({ source: new ol.source.Vector({ features: [marker] }) }));
+    // innerHTML로 막 삽입된 컨테이너는 아직 레이아웃(reflow)이 안 끝난 상태라 캔버스가 실제 크기 대신
+    // 브라우저 canvas 기본값(300x150)으로 그려지는 문제가 있음. updateSize()는 내부 크기 값(getSize())만
+    // 갱신할 뿐 <canvas> DOM 크기는 안 바꿔서 효과가 없었고, renderSync()로 강제로 다시 그려야 실제
+    // 캔버스 크기가 맞춰짐(실 브라우저 테스트로 확인, 2026-07-21). requestAnimationFrame은 브라우저가
+    // 백그라운드 탭 상태면 실행이 안/늦게 되는 경우가 있어(테스트로 확인) setTimeout(0)이 더 안전함
+    if (map.renderSync) setTimeout(() => map.renderSync(), 0);
+    return map;
+  } catch (e) {
+    showDebug('지도 표시 실패(' + containerId + ')', e.message);
+    return null;
+  }
+}
+
+function openMapModal(x, y) {
+  try {
+    document.getElementById('mapModalOverlay').classList.add('open');
+    // 모달은 열 때마다 컨테이너를 비우고 새로 그림(인스턴스 재사용보다 단순, 자주 여닫는 UI가 아니라 성능 부담 적음)
+    document.getElementById('vmapModal').innerHTML = '';
+    const map = renderParcelMap('vmapModal', x, y);
+    setTimeout(() => { if (map && map.renderSync) map.renderSync(); }, 100);
+  } catch (e) {
+    showDebug('지도 모달 열기 실패', e.message);
+  }
+}
+
+function closeMapModal() {
+  document.getElementById('mapModalOverlay').classList.remove('open');
+}
+
+document.getElementById('mapModalCloseBtn').addEventListener('click', closeMapModal);
+document.getElementById('mapModalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'mapModalOverlay') closeMapModal();
+});
+
 addrSearchBtn.addEventListener('click', async () => {
   const addrInputs = Array.from(document.querySelectorAll('.addrInputRow'));
   const addrs = addrInputs.map(el => el.value.trim()).filter(v => v);
@@ -5527,7 +5633,12 @@ addrSearchBtn.addEventListener('click', async () => {
       (combinedRisks.length > 0 ? ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">· ' + combinedRisks.map(r => r.label).join(', ') + '</span>' : '') +
       '<br>';
     html += '📐 합산 대지면적: <b>' + totalArea.toFixed(2) + ' ㎡</b>' + (missingAreaCount > 0 ? ' <span style="color:var(--warn);">(' + missingAreaCount + '개 필지 면적 미확인 — 실제보다 작게 계산됨)</span>' : '');
-    html += '</div></div>';
+    html += '</div>';
+    // 필지 여러 개(합필)여도 지도는 첫 번째 필지 위치만 표시(단순화) — 좌표가 없으면(검색 API 응답에 point 누락 등) 조용히 생략
+    if (first.x && first.y) {
+      html += '<div class="parcel-map-wrap" id="parcelMapWrap"><div id="vmap"></div><div class="mapExpandHint">🔍 눌러서 크게 보기</div></div>';
+    }
+    html += '</div>';
 
     if (!zoneConsistent && multiZoneWeighted) {
       const breakdownHtml = multiZoneWeighted.breakdown.map(b =>
@@ -5557,6 +5668,11 @@ addrSearchBtn.addEventListener('click', async () => {
 
     addrResultBox.style.display = 'block';
     addrResultBox.innerHTML = html;
+    if (first.x && first.y) {
+      renderParcelMap('vmap', first.x, first.y);
+      const wrapEl = document.getElementById('parcelMapWrap');
+      if (wrapEl) wrapEl.addEventListener('click', () => openMapModal(first.x, first.y));
+    }
 
     // 지역/용도지역/대지면적 자동 반영
     // 서울이 아니면 전부 GYEONGGI 참고표(21개 용도지역 전체 포함)로 zoneSel을 채움 — 예전엔 경기/인천만
