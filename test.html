@@ -5651,6 +5651,11 @@ async function lookupOverlayRisks(pnu, addr){
 // 끊어줘야 함 — 안 끊으면 검색을 여러 번 하거나 지도 모달을 여러 번 여닫을 때 내부 상태가 꼬여서
 // 초기화가 중간에 실패하고(zoom을 못 읽는 에러), 화면엔 확대/축소가 안 된 기본 지도(전 세계 축소본,
 // "한국 지도 전체"처럼 보임)만 남는 문제가 실제로 재현됨(2026-07-21)
+// 현재 배경지도가 위성(PHOTO_HYBRID)인지 — 주변 지번 레이어는 위성 모드에서만 보여줌(일반은 자체
+// 타일에 이미 지번이 있어서 겹치면 이중으로 진해짐). 새 지도는 항상 GRAPHIC으로 시작하므로 지도를
+// 새로 만들 때마다 false로 리셋됨(renderParcelMap 참고)
+let mapBasemapIsPhoto = false;
+
 // 주변 필지 지번 표시(플렉시티 참고, 2026-07-22) — 연속지적도(LP_PA_CBND_BUBUN)를 검색 필지 하나가
 // 아니라 주변 bbox로 조회해서 지번 라벨과 함께 그림. 지도 렌더링을 막지 않도록 항상 fire-and-forget로
 // 호출하고, 응답이 늦게 와도 그 사이 다른 검색으로 컨테이너가 재사용됐으면 버림(race condition 방지)
@@ -5695,8 +5700,16 @@ function renderNearbyParcels(map, feats) {
     const layer = new ol.layer.Vector({ source: new ol.source.Vector({ features: olFeatures }) });
     // appCustomLayer 태그 — 배경지도 전환 시(setBasemapType) VWorld가 새 타일 레이어를 이 레이어보다
     // 위쪽에 추가해서 통째로 가려지는 문제가 있어(2026-07-22, Kevin 제보: 위성 모드에서 지번이 전혀
-    // 안 보임), 태그를 달아두고 배경지도 버튼 클릭 핸들러에서 매번 맨 위로 재배치함
+    // 안 보임), 태그를 달아두고 배경지도 버튼 클릭 핸들러에서 매번 맨 위로 재배치함.
+    // 배열 순서 재배치만으로는 부족했음 — VWorld의 위성용 라벨 타일 레이어가 zIndex:10을 명시적으로
+    // 갖고 있어서(elementFromPoint·zIndex 직접 확인, 2026-07-22) 배열 순서와 무관하게 항상 위에
+    // 그려졌음. setZIndex로 명시적 우선순위를 줘야 실제로 이김
     layer.set('appCustomLayer', true);
+    layer.set('appNearbyLayer', true);
+    layer.setZIndex(90);
+    // 일반(GRAPHIC) 배경지도는 원래도 지번이 표시돼 있어서(VWorld 자체 타일) 우리 레이어까지 겹치면
+    // 선이 이중으로 진해져 정신없어짐(Kevin 제보) — 위성 모드에서만 보이게 함
+    layer.setVisible(mapBasemapIsPhoto);
     map.addLayer(layer); // 맨 위에 추가 — 검색 필지 강조 레이어는 아래에서 다시 맨 위로 재배치
     if (map.renderSync) map.renderSync();
   } catch (e) {
@@ -5710,6 +5723,7 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
     try { parcelMapInstances[containerId].setTarget(null); } catch (e) {}
     parcelMapInstances[containerId] = null;
   }
+  mapBasemapIsPhoto = false; // 새 지도는 항상 GRAPHIC(일반)으로 시작함
   try {
     if (typeof vw === 'undefined' || !vw.ol3 || typeof ol === 'undefined') return null;
     const zoom = initialZoom || 18;
@@ -5761,6 +5775,7 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
     }
     const highlightLayer = new ol.layer.Vector({ source: new ol.source.Vector({ features: features }) });
     highlightLayer.set('appCustomLayer', true);
+    highlightLayer.setZIndex(100); // VWorld 자체 타일 중 zIndex:10짜리가 있어서 그보다 확실히 높게
     map.addLayer(highlightLayer);
 
     // innerHTML로 막 삽입된 컨테이너는 아직 레이아웃(reflow)이 안 끝난 상태라 캔버스가 실제 크기 대신
@@ -5816,6 +5831,10 @@ document.querySelectorAll('.mapBasemapBtn').forEach(btn => {
       // 전환 직후 다시 맨 위로(배열 순서상 마지막으로) 재배치해서 항상 보이게 함
       const layers = map.getLayers();
       layers.getArray().filter(l => l.get('appCustomLayer')).forEach(l => { layers.remove(l); layers.push(l); });
+      // 일반 모드는 VWorld 자체 타일에 이미 지번이 있어서 우리 레이어까지 겹치면 이중으로 진해짐
+      // (Kevin 제보) — 위성 모드에서만 주변 지번 레이어를 보여줌
+      mapBasemapIsPhoto = btn.dataset.basemap === 'PHOTO_HYBRID';
+      layers.getArray().filter(l => l.get('appNearbyLayer')).forEach(l => l.setVisible(mapBasemapIsPhoto));
       // 배경지도 전환 직후 새 타일 레이어가 붙으면서 한 프레임 정도 화면이 살짝 밀려 보이는 현상 방지 —
       // 지도 최초 생성 때와 동일하게 renderSync로 강제 재계산(2026-07-22)
       setTimeout(() => { if (map.renderSync) map.renderSync(); }, 0);
