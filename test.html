@@ -5793,6 +5793,9 @@ document.querySelectorAll('.mapBasemapBtn').forEach(btn => {
       map.setBasemapType(vw.ol3.BasemapType[btn.dataset.basemap]);
       document.querySelectorAll('.mapBasemapBtn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      // 배경지도 전환 직후 새 타일 레이어가 붙으면서 한 프레임 정도 화면이 살짝 밀려 보이는 현상 방지 —
+      // 지도 최초 생성 때와 동일하게 renderSync로 강제 재계산(2026-07-22)
+      setTimeout(() => { if (map.renderSync) map.renderSync(); }, 0);
     } catch (e) {
       showDebug('배경지도 전환 실패', e.message);
     }
