@@ -340,7 +340,7 @@
     <div class="eyebrow">인허가 브릿지 · 법규 사전 검토 도구</div>
     <h1>건축 법규 계산기</h1>
     <p class="sub">주소만 입력하면 용도지역·대지면적을 자동으로 찾아드립니다. 건폐율·용적률 계산은 <b>조례 원문이 확인된 지역에서만</b> 제공합니다 — 확인 안 된 지역은 추정치도 보여드리지 않습니다.</p>
-    <p class="sub" style="margin-top:6px;">🔍 <b>AI 추정이 아닙니다.</b> 국토계획법·건축법 등 실제 법령 원문과 지자체 조례를 직접 확인해 판단합니다.</p>
+    <p class="sub" style="margin-top:6px;"><b>AI 추정이 아닙니다.</b> 국토계획법·건축법 등 실제 법령 원문과 지자체 조례를 직접 확인해 판단합니다.</p>
   </header>
 
   <section class="panel active" id="panel-fc">
@@ -458,12 +458,12 @@
       <div class="note-box" id="fcSetbackNote" style="display:none;"></div>
       <div class="note-box" id="fcSunlightNote" style="display:none;"></div>
       <div class="note-box" id="sunlightCalcBox" style="display:none;">
-        <label for="sunlightDistInput" style="display:block; font-size:13px; font-weight:600; color:var(--ink-deep); margin-bottom:7px;">📐 정북 방향 인접대지경계선까지의 거리로 최고 높이 계산 (m, 선택)</label>
+        <label for="sunlightDistInput" style="display:block; font-size:13px; font-weight:600; color:var(--ink-deep); margin-bottom:7px;">정북 방향 인접대지경계선까지의 거리로 최고 높이 계산 (m, 선택)</label>
         <input type="number" id="sunlightDistInput" placeholder="예: 3" min="0" step="0.01">
         <div id="sunlightCalcResult" style="margin-top:8px; font-size:13px;"></div>
       </div>
       <div class="note-box" id="fcNote"></div>
-      <button type="button" id="pdfSaveBtn" class="no-print" style="width:100%; margin-top:12px; padding:11px; border:1.5px solid var(--ink); border-radius:8px; background:transparent; color:var(--ink-deep); font-size:13.5px; cursor:pointer;">📄 이 결과 PDF로 저장</button>
+      <button type="button" id="pdfSaveBtn" class="no-print" style="width:100%; margin-top:12px; padding:11px; border:1.5px solid var(--ink); border-radius:8px; background:transparent; color:var(--ink-deep); font-size:13.5px; cursor:pointer;">이 결과 PDF로 저장</button>
       <div class="no-print" style="margin-top:16px; padding:16px; border:1.5px dashed var(--ink); border-radius:8px;">
         <div id="consultLabel" style="font-size:13.5px; color:var(--ink-deep); margin-bottom:10px; text-align:center;">이 결과로 건축사 상담을 받아보고 싶으신가요?</div>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
@@ -5496,7 +5496,7 @@ const OVERLAY_RISK_KEYWORDS = [
 
 // 지역지구 감지 결과(아래에서든, 위 목록에서든)에는 항상 이 캐비어트를 붙여서 21개 법령 중 18개만
 // 확인한다는 사실을 명시 — "이 목록에 없음 = 완전히 안전"으로 오인하지 않도록 함
-const OVERLAY_COVERAGE_NOTE = 'ℹ️ 이 검사는 건축법 시행령 제10조 관련 법령 21개 중 18개 항목을 기준으로 합니다. <b>택지개발지구</b>(대부분 공공주택지구로 대체되어 이 앱이 감지하는 경우가 많음) 지정 여부와 <b>부설주차장·교통영향평가</b> 관련 절차는 이 앱에서 확인되지 않으니 관할 시·군·구청에 별도로 확인하세요. <b>지하철역사·지하철 지하구조물 인접 여부(지하안전영향평가 대상 여부)</b>도 토지이용계획 데이터에 등재되지 않아 이 앱이 감지할 수 없으니, 지하철역 인근 부지는 반드시 관할 철도·도시철도 운영기관(서울교통공사 등)에 별도로 확인하세요.';
+const OVERLAY_COVERAGE_NOTE = '이 검사는 건축법 시행령 제10조 관련 법령 21개 중 18개 항목을 기준으로 합니다. <b>택지개발지구</b>(대부분 공공주택지구로 대체되어 이 앱이 감지하는 경우가 많음) 지정 여부와 <b>부설주차장·교통영향평가</b> 관련 절차는 이 앱에서 확인되지 않으니 관할 시·군·구청에 별도로 확인하세요. <b>지하철역사·지하철 지하구조물 인접 여부(지하안전영향평가 대상 여부)</b>도 토지이용계획 데이터에 등재되지 않아 이 앱이 감지할 수 없으니, 지하철역 인근 부지는 반드시 관할 철도·도시철도 운영기관(서울교통공사 등)에 별도로 확인하세요.';
 
 // 반환값: { risks: [...], checked: true/false } — checked=false(조회 자체가 실패)와 risks=[](정상 조회했는데
 // 해당사항 없음)을 구분해야 함. 조회 실패를 "위험 없음"으로 오인해 확정 계산을 보여주면 안 되기 때문(애매한
@@ -5723,10 +5723,10 @@ addrSearchBtn.addEventListener('click', async () => {
     } else if (lastNarrowestRoad && lastNarrowestRoad.width !== null && lastNarrowestRoad.width < 4) {
       roadFieldEl.style.display = 'block';
       const setback = (4 - lastNarrowestRoad.width) / 2;
-      roadHintEl.innerHTML = '⚠️ 접한 도로(' + lastNarrowestRoad.raw + ')의 폭이 4m 미만이라 건축법 제46조상 도로 중심선에서 ' + setback.toFixed(2) + 'm 후퇴한 선이 건축선이 됩니다. 도로에 접한 변의 길이를 입력하면 후퇴로 줄어드는 대지면적을 계산에 반영합니다(미입력 시 반영 안 됨).';
+      roadHintEl.innerHTML = '접한 도로(' + lastNarrowestRoad.raw + ')의 폭이 4m 미만이라 건축법 제46조상 도로 중심선에서 ' + setback.toFixed(2) + 'm 후퇴한 선이 건축선이 됩니다. 도로에 접한 변의 길이를 입력하면 후퇴로 줄어드는 대지면적을 계산에 반영합니다(미입력 시 반영 안 됨).';
     } else if (lastNarrowestRoad && lastNarrowestRoad.width === null) {
       roadFieldEl.style.display = 'block';
-      roadHintEl.innerHTML = '⚠️ 접한 도로(' + lastNarrowestRoad.raw + ')의 폭 정보가 확인되지 않았습니다. 폭이 4m 미만이면 건축법 제46조에 따라 건축선이 후퇴되어 대지면적이 줄어들 수 있으니, 실제 도로 폭을 관할 구청에 확인하세요.';
+      roadHintEl.innerHTML = '접한 도로(' + lastNarrowestRoad.raw + ')의 폭 정보가 확인되지 않았습니다. 폭이 4m 미만이면 건축법 제46조에 따라 건축선이 후퇴되어 대지면적이 줄어들 수 있으니, 실제 도로 폭을 관할 구청에 확인하세요.';
     } else {
       roadFieldEl.style.display = 'none';
       document.getElementById('roadFrontageWidth').value = '';
@@ -5761,14 +5761,14 @@ addrSearchBtn.addEventListener('click', async () => {
       html += '<div style="margin-top:8px;">' + rowsHtml + '</div>';
     }
     html += '<div style="font-size:14px; line-height:1.8;">';
-    html += '📍 ' + first.sido + ' ' + first.sigg + '<br>';
-    html += '🏷️ 용도지역: <b>' + (zoneConsistent ? first.uname : unames.join(' / ') + ' (필지마다 다름)') + '</b>' +
+    html += first.sido + ' ' + first.sigg + '<br>';
+    html += '용도지역: <b>' + (zoneConsistent ? first.uname : unames.join(' / ') + ' (필지마다 다름)') + '</b>' +
       (combinedRisks.length > 0 ? ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">· ' + combinedRisks.map(r => r.label).join(', ') + '</span>' : '') +
       '<br>';
-    html += '📐 합산 대지면적: <b>' + totalArea.toFixed(2) + ' ㎡</b>' + (missingAreaCount > 0 ? ' <span style="color:var(--warn);">(' + missingAreaCount + '개 필지 면적 미확인 — 실제보다 작게 계산됨)</span>' : '');
+    html += '합산 대지면적: <b>' + totalArea.toFixed(2) + ' ㎡</b>' + (missingAreaCount > 0 ? ' <span style="color:var(--warn);">(' + missingAreaCount + '개 필지 면적 미확인 — 실제보다 작게 계산됨)</span>' : '');
     // 필지 여러 개(합필)여도 공시지가는 첫 번째 필지 기준으로만 표시(필지마다 값이 달라 합산이 애매해서 단순화)
     if (first.landPrice) {
-      html += '<br>📊 개별공시지가: <b>' + first.landPrice.pricePerM2.toLocaleString('ko-KR') + '원/㎡</b>' +
+      html += '<br>개별공시지가: <b>' + first.landPrice.pricePerM2.toLocaleString('ko-KR') + '원/㎡</b>' +
         ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">(' + first.landPrice.year + '년 기준' + (addrs.length > 1 ? ', 첫 필지 기준' : '') + ')</span>';
     }
     html += '</div>';
@@ -5778,7 +5778,7 @@ addrSearchBtn.addEventListener('click', async () => {
       const floorParts = [];
       if (fi.maxGroundFloor) floorParts.push('지상 ' + fi.maxGroundFloor + (fi.approxOnly ? '층 이상' : '층'));
       if (fi.maxUndergroundFloor) floorParts.push('지하 ' + fi.maxUndergroundFloor + (fi.approxOnly ? '층 이상' : '층'));
-      html += '<div class="note-box">🏢 <b>기존 건축물이 있습니다</b>' + (fi.bldNm ? ' — ' + fi.bldNm : '') +
+      html += '<div class="note-box"><b>기존 건축물이 있습니다</b>' + (fi.bldNm ? ' — ' + fi.bldNm : '') +
         (floorParts.length > 0 ? ' (' + floorParts.join(' · ') + ')' : '') +
         (fi.mainPurpose ? ', 주용도: ' + fi.mainPurpose : '') +
         '<br><span style="font-size:12px; color:var(--text-muted);">건축물대장 층별개요 기준' + (fi.approxOnly ? ' · 세대수가 많아 일부 데이터만 조회됨' : '') + (addrs.length > 1 ? ' · 첫 필지 기준' : '') + '</span></div>';
@@ -5790,25 +5790,25 @@ addrSearchBtn.addEventListener('click', async () => {
       const breakdownHtml = multiZoneWeighted.breakdown.map(b =>
         b.uname + ' ' + b.area.toFixed(2) + '㎡(건폐율' + b.coverage + '%·용적률' + b.floor + '%)'
       ).join(' + ');
-      html += '<div class="note-box">🧮 필지들의 용도지역이 서로 달라, <b>국토계획법 제84조</b>에 따라 각 필지 면적 비율로 건폐율·용적률을 가중평균해서 계산합니다.<br>' +
+      html += '<div class="note-box">필지들의 용도지역이 서로 달라, <b>국토계획법 제84조</b>에 따라 각 필지 면적 비율로 건폐율·용적률을 가중평균해서 계산합니다.<br>' +
         breakdownHtml + '<br>가중평균 건폐율 <b>' + multiZoneWeighted.coverage.toFixed(1) + '%</b> · 용적률 <b>' + multiZoneWeighted.floor.toFixed(1) + '%</b> — 실제 적용은 반드시 관할 구청과 사전 협의하세요.</div>';
     } else if (!zoneConsistent) {
-      html += '<div class="note-box warn">⚠ 선택하신 필지들의 용도지역이 서로 다르지만, 일부 필지의 조례 원문이 아직 확정되지 않아 가중평균 계산을 할 수 없습니다. 아래 계산은 <b>' + first.uname + '</b> 기준으로만 참고용으로 반영되며, 정확한 수치는 관할 구청에 문의하세요.</div>';
+      html += '<div class="note-box warn">선택하신 필지들의 용도지역이 서로 다르지만, 일부 필지의 조례 원문이 아직 확정되지 않아 가중평균 계산을 할 수 없습니다. 아래 계산은 <b>' + first.uname + '</b> 기준으로만 참고용으로 반영되며, 정확한 수치는 관할 구청에 문의하세요.</div>';
     }
     if (failResults.length > 0) {
-      html += '<div class="note-box warn">⚠ 조회 실패: ' + failResults.map(r => r.addr + ' — ' + r.error).join(', ') + '</div>';
+      html += '<div class="note-box warn">조회 실패: ' + failResults.map(r => r.addr + ' — ' + r.error).join(', ') + '</div>';
     }
     // 지역지구 위험 체크리스트·커버리지 안내·조회실패 경고는 여기서 중복 표시하지 않음 — 주소검색이
     // 자동으로 계산하기(calcFC)까지 실행시키므로, 같은 내용이 아래 계산결과 영역(noteEl)에 한 번만 뜸
     // (Kevin 피드백 2026-07-11: 같은 박스가 위아래 2곳에 뜨는 게 불편, "위에 있는 건 없애라")
     if (lastLandCategoryInfo && lastLandCategoryInfo.needsChange) {
-      html += '<div class="note-box warn">🚜 <b>지목변경이 필요할 수 있습니다</b> — 이 토지의 지목은 "' + lastLandCategoryInfo.jimoks.join(', ') + '"로, 건축을 위해서는 먼저 지목변경(토목 인허가)이 필요합니다. 건축사뿐 아니라 <b>토목기술사 상담도 함께 받아보시길 권장합니다</b>.</div>';
+      html += '<div class="note-box warn"><b>지목변경이 필요할 수 있습니다</b> — 이 토지의 지목은 "' + lastLandCategoryInfo.jimoks.join(', ') + '"로, 건축을 위해서는 먼저 지목변경(토목 인허가)이 필요합니다. 건축사뿐 아니라 <b>토목기술사 상담도 함께 받아보시길 권장합니다</b>.</div>';
       // 지목이 실제 농지(전·답·과수원)인 경우 — 지목변경·건축허가 없이 훨씬 간단히 이용 가능한
       // "농촌체류형 쉼터" 대안을 함께 안내 (33㎡ 이하, 가설건축물 신고만으로 취사·취침 가능, 농지법
       // 시행규칙 2025.1.1 시행). Kevin 요청으로 추가(2026-07-11)
       const AGRI_JIMOKS = ['전', '답', '과수원'];
       if (lastLandCategoryInfo.jimoks.some(j => AGRI_JIMOKS.includes(j))) {
-        html += '<div class="note-box">🏕️ <b>참고: 농촌체류형 쉼터라는 대안도 있습니다</b> — 지목변경·건축허가 없이 가설건축물 신고만으로 연면적 33㎡ 이하 소형 쉼터를 설치해 취사·취침까지 가능합니다(농지법 시행규칙, 2025.1.1 시행). 농지 소유자 본인이 설치 가능하며 농업진흥구역 여부와 무관하게 가능하나, 방재지구·붕괴위험지역·자연재해위험개선지구·개발제한구역 내 농지는 제외됩니다. 필지 면적이 쉼터+부속시설(데크 등) 합산 면적의 2배 이상이어야 하며 최장 12년까지 사용 가능(3년마다 갱신) — 정확한 설치 가능 여부는 관할 시·군·구 농지 담당 부서에 확인하세요.</div>';
+        html += '<div class="note-box"><b>참고: 농촌체류형 쉼터라는 대안도 있습니다</b> — 지목변경·건축허가 없이 가설건축물 신고만으로 연면적 33㎡ 이하 소형 쉼터를 설치해 취사·취침까지 가능합니다(농지법 시행규칙, 2025.1.1 시행). 농지 소유자 본인이 설치 가능하며 농업진흥구역 여부와 무관하게 가능하나, 방재지구·붕괴위험지역·자연재해위험개선지구·개발제한구역 내 농지는 제외됩니다. 필지 면적이 쉼터+부속시설(데크 등) 합산 면적의 2배 이상이어야 하며 최장 12년까지 사용 가능(3년마다 갱신) — 정확한 설치 가능 여부는 관할 시·군·구 농지 담당 부서에 확인하세요.</div>';
       }
     }
 
@@ -5893,7 +5893,7 @@ function renderSunlightCalc() {
   if (!lastSunlightRule || !(d >= 0)) { box.textContent = ''; return; }
   const maxH = computeSunlightMaxHeight(d, lastSunlightRule);
   if (maxH === 0) {
-    box.innerHTML = '⛔ 이 거리(' + d + 'm)는 최소 이격거리(' + lastSunlightRule.distUnderM + 'm) 미달이라, 이 지점에는 건축물을 세울 수 없습니다.';
+    box.innerHTML = '이 거리(' + d + 'm)는 최소 이격거리(' + lastSunlightRule.distUnderM + 'm) 미달이라, 이 지점에는 건축물을 세울 수 없습니다.';
   } else {
     box.innerHTML = '이 지점(정북 인접대지경계선으로부터 ' + d + 'm)에서 허용되는 <b>최고 높이: 약 ' + maxH.toFixed(2) + 'm</b><br><span style="font-size:12px; color:var(--text-muted);">건축법 시행령 제86조상 이격거리 규정을 역산한 값으로, 실제 최고높이는 가로구역별 높이제한 등 다른 규정에 따라 더 낮아질 수 있습니다.</span>';
   }
@@ -6168,12 +6168,12 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     }
     noteEl.className = 'note-box warn';
     const overlayChecklistHtml = blockingRisks.map(r => renderRiskItem(r, '동의·허가 필요: ')).join('');
-    let html = '🚧 <b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b>:' +
+    let html = '<b>이 부지는 국토계획법 용도지역 외에 아래 지역·지구에도 해당되어, 각 기관의 동의·허가 절차가 추가로 필요합니다</b>:' +
       '<div style="margin-top:8px;">' + overlayChecklistHtml + '</div>' +
       '<div style="margin-top:8px; font-size:12.5px;">기관별 협의·허가는 접수부터 완료까지 수 주~수 개월 걸리는 경우가 많으니, 인허가 일정을 잡을 때 반드시 감안하세요.</div>' +
-      '<div style="margin-top:8px; font-size:12.5px; font-weight:600;">⚠️ "계산 불가"는 이 앱이 자동으로 확정 숫자를 낼 수 없다는 뜻이지, 건축이 불가능하다는 뜻이 아닙니다. 기존 건축물 증축·개축이나 자격요건 충족 시 신축 등 예외가 있을 수 있으니, 위 각 항목의 소관기관에 직접 문의해 실제 가능 여부를 확인하세요.</div>';
+      '<div style="margin-top:8px; font-size:12.5px; font-weight:600;">"계산 불가"는 이 앱이 자동으로 확정 숫자를 낼 수 없다는 뜻이지, 건축이 불가능하다는 뜻이 아닙니다. 기존 건축물 증축·개축이나 자격요건 충족 시 신축 등 예외가 있을 수 있으니, 위 각 항목의 소관기관에 직접 문의해 실제 가능 여부를 확인하세요.</div>';
     if (juklakRisk) {
-      html += '<div class="note-box" style="margin-top:8px; background:var(--paper); border-color:var(--ink);">🏘️ <b>위 건폐율·용적률·층수는 집단취락지구 국가기준 상한(참고치)입니다</b> — 이 부지는 기존 마을(취락)로 완전 금지가 아니라 완화된 기준이 적용됩니다.<br>' +
+      html += '<div class="note-box" style="margin-top:8px; background:var(--paper); border-color:var(--ink);"><b>위 건폐율·용적률·층수는 집단취락지구 국가기준 상한(참고치)입니다</b> — 이 부지는 기존 마을(취락)로 완전 금지가 아니라 완화된 기준이 적용됩니다.<br>' +
         '<span style="font-size:12.5px; color:var(--text-muted);">개발제한구역법령상 전국 공통 상한이며, 정확한 수치는 지자체 조례로 별도 확정되니 반드시 관할 구청에 확인하세요.</span></div>';
     }
     // 차단 항목 외에 추가로 감지된 참고사항(blocking:false)도 놓치지 않고 함께 보여줌 — 이전엔 이 분기에서
@@ -6181,7 +6181,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     // 공장설립승인지역·과밀억제권역·토지거래허가구역까지 5건이 더 감지되는데 전부 화면에서 사라졌었음).
     if (advisoryRisks.length > 0) {
       const advisoryHtml = advisoryRisks.map(r => renderRiskItem(r)).join('');
-      html += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항입니다 ' +
+      html += '<div class="note-box" style="margin-top:8px;"><b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항입니다 ' +
         '<a href="#" class="riskInfoLink" data-title="참고사항이란?" data-body="' + escapeHtmlAttr('위 건폐율·용적률 계산과는 별개로, 이 부지에 추가로 지정된 지역·지구입니다. 대부분 특정 용도(공장·가축시설 등)로 짓거나, 매매할 때만 관련되는 절차라서 일반적인 건축 계산 자체를 막지는 않습니다. 다만 실제로 그 용도로 짓거나 거래하실 계획이라면 아래 각 항목의 소관기관에 미리 확인하는 것이 안전합니다.') + '" style="font-size:12.5px; text-decoration:underline;">자세히</a>' +
         ':<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
     }
@@ -6189,7 +6189,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     noteEl.innerHTML = html;
     trustBadgeEl.style.background = 'var(--warn-bg)';
     trustBadgeEl.style.color = 'var(--warn)';
-    trustBadgeEl.innerHTML = juklakRisk ? '🚧 추가 동의 필요 · 건폐율·용적률은 국가기준 참고치' : '🚧 추가 기관 동의 필요 지역 감지됨';
+    trustBadgeEl.innerHTML = juklakRisk ? '추가 동의 필요 · 건폐율·용적률은 국가기준 참고치' : '추가 기관 동의 필요 지역 감지됨';
   } else if(multiZoneWeighted){
     const buildArea = site * multiZoneWeighted.coverage / 100;
     const floorArea = site * multiZoneWeighted.floor / 100;
@@ -6216,7 +6216,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     floorAreaEl.textContent = floorArea.toLocaleString(undefined,{maximumFractionDigits:2}) + ' ㎡';
     floorRateEl.textContent = '용적률 ' + z.floor + '% 기준';
     let noteHtml = '<b>' + zoneName + '</b> · 서울특별시 도시계획 조례 제54·55조 기준입니다.';
-    if(z.tempNote){ noteHtml += '<br>⚠ ' + z.tempNote; }
+    if(z.tempNote){ noteHtml += '<br>' + z.tempNote; }
     noteHtml += '<br>지구단위계획구역, 정비구역, 도로 조건 등에 따라 실제 적용 수치는 달라질 수 있습니다. 자세한 내용은 아래 내용을 참고 하세요.';
     noteEl.className = 'note-box';
     noteEl.innerHTML = noteHtml;
@@ -6251,7 +6251,7 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     lastMaxFloorArea = null;
     trustBadgeEl.style.background = 'var(--warn-bg)';
     trustBadgeEl.style.color = 'var(--warn)';
-    trustBadgeEl.innerHTML = '⛔ 미확정 지역 · ' + (lastDetectedSigg || '지자체 미확인') + ' — 결과 제공 안 함';
+    trustBadgeEl.innerHTML = '미확정 지역 · ' + (lastDetectedSigg || '지자체 미확인') + ' — 결과 제공 안 함';
     if (typeof gtag === 'function') {
       gtag('event', 'unconfirmed_region_shown', { sigg: lastDetectedSigg || '(미확인)' });
     }
@@ -6263,19 +6263,19 @@ document.getElementById('calcFC').addEventListener('click', ()=>{
     noteEl.innerHTML += '<div style="margin-top:8px; font-size:12.5px; opacity:0.85;">' + OVERLAY_COVERAGE_NOTE + '</div>';
     if (advisoryRisks.length > 0) {
       const advisoryHtml = advisoryRisks.map(r => renderRiskItem(r)).join('');
-      noteEl.innerHTML += '<div class="note-box" style="margin-top:8px;">📋 <b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항이라 위 건폐율/용적률 계산은 그대로 유효하지만, 해당 용도라면 미리 확인하세요 ' +
+      noteEl.innerHTML += '<div class="note-box" style="margin-top:8px;"><b>참고사항</b> — 이 부지는 아래 지역·지구에도 해당됩니다. 특정 용도로 짓거나 매매하실 때만 관련되는 사항이라 위 건폐율/용적률 계산은 그대로 유효하지만, 해당 용도라면 미리 확인하세요 ' +
         '<a href="#" class="riskInfoLink" data-title="참고사항이란?" data-body="' + escapeHtmlAttr('위 건폐율·용적률 계산과는 별개로, 이 부지에 추가로 지정된 지역·지구입니다. 대부분 특정 용도(공장·가축시설 등)로 짓거나, 매매할 때만 관련되는 절차라서 일반적인 건축 계산 자체를 막지는 않습니다. 다만 실제로 그 용도로 짓거나 거래하실 계획이라면 아래 각 항목의 소관기관에 미리 확인하는 것이 안전합니다.') + '" style="font-size:12.5px; text-decoration:underline;">자세히</a>' +
         ':<div style="margin-top:6px;">' + advisoryHtml + '</div></div>';
     }
   } else if (lastOverlayRisks && !lastOverlayRisks.checked) {
     // 지역지구 조회 자체가 실패한 경우 — 아래 건폐율/용적률 숫자는 국토계획법 기준으로는 유효하지만,
     // 개발제한구역 등 중복 여부는 확인 못 했다는 걸 명확히 알려야 함("위험 없음"으로 오인 방지)
-    noteEl.innerHTML += '<div style="margin-top:8px;" class="note-box warn">⚠️ <b>지역·지구 중복 확인에 실패했습니다</b> — 개발제한구역 등 다른 법령 지역·지구 해당 여부를 확인하지 못했습니다. 새로고침 후 다시 조회하시거나, 관할 시·군·구청에 직접 확인하세요.</div>';
+    noteEl.innerHTML += '<div style="margin-top:8px;" class="note-box warn"><b>지역·지구 중복 확인에 실패했습니다</b> — 개발제한구역 등 다른 법령 지역·지구 해당 여부를 확인하지 못했습니다. 새로고침 후 다시 조회하시거나, 관할 시·군·구청에 직접 확인하세요.</div>';
   }
 
   // 건축선 후퇴(건축법 제46조) 반영 시 — 위 건폐율/용적률이 원래 입력값이 아니라 유효 대지면적 기준임을 명시
   if (setbackAreaLoss > 0) {
-    noteEl.innerHTML += '<div style="margin-top:8px;" class="note-box warn">📐 <b>건축선 후퇴(건축법 제46조) 반영됨</b> — 접한 도로 폭이 4m 미만이라 도로 중심선에서 ' +
+    noteEl.innerHTML += '<div style="margin-top:8px;" class="note-box warn"><b>건축선 후퇴(건축법 제46조) 반영됨</b> — 접한 도로 폭이 4m 미만이라 도로 중심선에서 ' +
       setbackDistanceM.toFixed(2) + 'm 후퇴한 선이 건축선이 되며, 입력하신 도로변 길이 ' + frontageWidthInput.toLocaleString(undefined,{maximumFractionDigits:2}) +
       'm 기준 약 ' + setbackAreaLoss.toLocaleString(undefined,{maximumFractionDigits:2}) + '㎡가 대지면적에서 제외됩니다.<br>' +
       '<span style="font-size:12.5px; color:var(--text-muted);">원래 입력 대지면적 ' + originalSite.toLocaleString(undefined,{maximumFractionDigits:2}) + '㎡ → 유효 대지면적 ' +
@@ -6348,7 +6348,7 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
     const s = ordinance.sunlight;
     sunlightNoteEl.style.display = 'block';
     sunlightNoteEl.className = 'note-box';
-    sunlightNoteEl.innerHTML = '☀️ <b>일조권 이격거리 (정북방향 인접대지경계선 기준)</b> — 높이 ' + s.heightThresholdM + 'm 이하 부분: ' + s.distUnderM + 'm 이상 / ' + s.note + '.<br><span style="font-size:12.5px; color:var(--text-muted);">' + ordinance.sunlightBasis + '</span>';
+    sunlightNoteEl.innerHTML = '<b>일조권 이격거리 (정북방향 인접대지경계선 기준)</b> — 높이 ' + s.heightThresholdM + 'm 이하 부분: ' + s.distUnderM + 'm 이상 / ' + s.note + '.<br><span style="font-size:12.5px; color:var(--text-muted);">' + ordinance.sunlightBasis + '</span>';
     lastSunlightRule = { heightThresholdM: s.heightThresholdM, distUnderM: s.distUnderM };
     sunlightCalcBoxEl.style.display = 'block';
     renderSunlightCalc();
@@ -6356,7 +6356,7 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
     // 서울·경기 외 지역 — 일조권 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
     sunlightNoteEl.style.display = 'block';
     sunlightNoteEl.className = 'note-box';
-    sunlightNoteEl.innerHTML = '☀️ <b>일조권 이격거리</b> — 현재 서울·경기 지역만 서비스합니다.';
+    sunlightNoteEl.innerHTML = '<b>일조권 이격거리</b> — 현재 서울·경기 지역만 서비스합니다.';
     lastSunlightRule = null;
     sunlightCalcBoxEl.style.display = 'none';
   } else {
@@ -6368,7 +6368,7 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
   // 대지안의 공지 — 공동주택(house)이고 세부유형을 선택했을 때만, 조례 데이터가 있는 도시에서 표시
   if (ordinance && ordinance.setback && useType === 'house' && houseSubtype) {
     const sb = ordinance.setback;
-    let html = '📏 <b>대지 안의 공지 (이격거리)</b><br>';
+    let html = '<b>대지 안의 공지 (이격거리)</b><br>';
     if (houseSubtype === 'apt') {
       html += '아파트 — 건축선: ' + sb.apt.road + 'm 이상 / 인접대지경계선: ' + sb.apt.boundary + 'm 이상';
       if (sb.apt.note) html += '<br><span style="font-size:12.5px; color:var(--text-muted);">' + sb.apt.note + '</span>';
@@ -6385,12 +6385,12 @@ function renderExtraResults(buildArea, floorArea, site, buildingOrdinanceKey, is
     // 서울·경기 외 지역 — 대지안의공지 조례 데이터 미수집. 침묵 대신 명시적으로 서비스 범위 고지
     setbackNoteEl.style.display = 'block';
     setbackNoteEl.className = 'note-box';
-    setbackNoteEl.innerHTML = '📏 <b>대지 안의 공지 (이격거리)</b> — 현재 서울·경기 지역만 서비스합니다.';
+    setbackNoteEl.innerHTML = '<b>대지 안의 공지 (이격거리)</b> — 현재 서울·경기 지역만 서비스합니다.';
   } else if (useType === 'house' && houseSubtype && ordinance && !ordinance.setback) {
     // 서울·경기 지역이지만 별표 파일 미확보(여주시·광주시) — 조례 자체가 없다는 오해 없이 "해당없음" 고지
     setbackNoteEl.style.display = 'block';
     setbackNoteEl.className = 'note-box';
-    setbackNoteEl.innerHTML = '📏 <b>대지 안의 공지 (이격거리)</b> — 해당없음(이 지역은 대지안의공지 기준 자료를 확보하지 못했습니다).';
+    setbackNoteEl.innerHTML = '<b>대지 안의 공지 (이격거리)</b> — 해당없음(이 지역은 대지안의공지 기준 자료를 확보하지 못했습니다).';
   } else {
     setbackNoteEl.style.display = 'none';
   }
