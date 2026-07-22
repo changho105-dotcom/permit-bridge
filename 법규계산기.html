@@ -92,6 +92,14 @@
     font-family:'IBM Plex Sans KR', sans-serif; cursor:pointer;
     box-shadow:0 4px 14px rgba(0,0,0,0.25);
   }
+  /* 용도지역·지구 색상 범례 — 네이버지도 지적편집도 참고. 화면에 실제 표시된 구역만 나열됨 */
+  .mapZoneLegend{
+    position:absolute; left:16px; bottom:16px; z-index:50;
+    background:rgba(255,255,255,0.92); border:1.5px solid var(--ink);
+    border-radius:8px; padding:9px 12px; max-width:200px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.15);
+    font-family:'IBM Plex Sans KR', sans-serif;
+  }
   /* 최근 검색 칩 — localStorage에 저장된 최대 5개 주소를 눌러서 바로 재조회 */
   .recentSearchChip{
     border:1.5px solid var(--paper-line-strong); background:#fff;
@@ -545,6 +553,7 @@
     <button type="button" class="mapBasemapBtn" data-basemap="PHOTO_HYBRID">위성</button>
   </div>
   <button type="button" class="mapConsultFab" id="mapConsultFab" style="display:none;">건축사·설계 상담 신청하기</button>
+  <div id="mapZoneLegend" class="mapZoneLegend" style="display:none;"></div>
 </div>
 </div>
 
@@ -5650,6 +5659,48 @@ async function lookupOverlayRisks(pnu, addr){
 // 새로 만들 때마다 false로 리셋됨(renderParcelMap 참고)
 let mapBasemapIsPhoto = false;
 
+// 용도지역·용도지구·용도구역 색상 구역 표시(네이버지도 지적편집도 참고, 2026-07-22) — 국토교통부
+// 표준 배색 계열을 근사해서 구역명(uname) 텍스트를 키워드로 매칭. 정확한 법정 고시 색상표는 아니고
+// 육안 구분용 근사 배색이므로, 실제 규제 판정은 여기 색이 아니라 기존 조회 결과(overlayRisks 등)를
+// 따를 것 — 이 레이어는 어디까지나 시각 참고용
+function getZoneStyle(uname) {
+  if (!uname) return { fill: 'rgba(150,150,150,0.15)', stroke: 'rgba(120,120,120,0.4)' };
+  if (uname.includes('전용주거')) return { fill: 'rgba(255,230,150,0.35)', stroke: 'rgba(230,180,60,0.6)' };
+  if (uname.includes('주거') ) return { fill: 'rgba(255,209,60,0.32)', stroke: 'rgba(230,160,20,0.6)' };
+  if (uname.includes('상업')) return { fill: 'rgba(255,107,107,0.28)', stroke: 'rgba(220,60,60,0.6)' };
+  if (uname.includes('공업')) return { fill: 'rgba(151,117,250,0.28)', stroke: 'rgba(110,80,220,0.6)' };
+  if (uname.includes('녹지')) return { fill: 'rgba(81,207,102,0.28)', stroke: 'rgba(40,160,60,0.6)' };
+  if (uname.includes('관리지역')) return { fill: 'rgba(212,199,122,0.30)', stroke: 'rgba(170,155,70,0.6)' };
+  if (uname.includes('농림')) return { fill: 'rgba(169,165,74,0.30)', stroke: 'rgba(130,125,40,0.6)' };
+  if (uname.includes('자연환경보전')) return { fill: 'rgba(76,107,94,0.30)', stroke: 'rgba(40,70,60,0.6)' };
+  if (uname.includes('취락')) return { fill: 'rgba(255,159,67,0.30)', stroke: 'rgba(220,120,20,0.65)' };
+  if (uname.includes('개발제한')) return { fill: 'rgba(255,80,80,0.10)', stroke: 'rgba(255,60,60,0.7)' };
+  if (uname.includes('지구단위계획')) return { fill: 'rgba(66,133,244,0.10)', stroke: 'rgba(40,100,220,0.6)' };
+  if (uname.includes('거래') || uname.includes('허가구역')) return { fill: 'rgba(255,159,67,0.08)', stroke: 'rgba(220,120,20,0.5)' };
+  if (uname.includes('경관') || uname.includes('고도') || uname.includes('방화') || uname.includes('방재') || uname.includes('보호')) return { fill: 'rgba(120,120,190,0.12)', stroke: 'rgba(90,90,160,0.5)' };
+  return { fill: 'rgba(150,150,150,0.15)', stroke: 'rgba(120,120,120,0.4)' };
+}
+
+// 용도지역(LT_C_UQ111~114) + 주요 용도지구·용도구역(경관/고도/방화/방재/취락/개발제한/지구단위계획 등)을
+// bbox로 한 번에 조회. 레이어마다 존재하지 않는 지역도 많아(대부분 ERROR/NOT_FOUND) 전부 Promise.all로
+// 병렬 조회하고 실패한 건 조용히 무시
+async function lookupNearbyZones(x, y) {
+  const d = 0.0018;
+  const bbox = (x - d) + ',' + (y - d) + ',' + (x + d) + ',' + (y + d);
+  const zoneLayerIds = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114', 'LT_C_UQ121', 'LT_C_UQ124', 'LT_C_UQ126', 'LT_C_UQ127', 'LT_C_UQ128', 'LT_C_UQ129', 'LT_C_UQ141'];
+  const results = await Promise.all(zoneLayerIds.map(async (id) => {
+    const url = 'https://api.vworld.kr/req/data?service=data&request=GetFeature&data=' + id + '&geomFilter=BOX(' + bbox + ')&format=json&geometry=true&crs=EPSG:4326&size=100&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
+    try {
+      const data = await vworldRequest(url);
+      const status = data && data.response && data.response.status;
+      return status === 'OK' ? data.response.result.featureCollection.features : [];
+    } catch (e) {
+      return [];
+    }
+  }));
+  return results.flat();
+}
+
 // 주변 필지 지번 표시(플렉시티 참고, 2026-07-22) — 연속지적도(LP_PA_CBND_BUBUN)를 검색 필지 하나가
 // 아니라 주변 bbox로 조회해서 지번 라벨과 함께 그림. 지도 렌더링을 막지 않도록 항상 fire-and-forget로
 // 호출하고, 응답이 늦게 와도 그 사이 다른 검색으로 컨테이너가 재사용됐으면 버림(race condition 방지)
@@ -5717,6 +5768,55 @@ function renderNearbyParcels(map, feats) {
   } catch (e) {
     showDebug('주변 지번 그리기 실패', e.message);
   }
+}
+
+// 용도지역·지구·구역 색상 폴리곤 그리기 — 지번 경계선/강조 레이어보다는 아래, 배경지도보다는 위
+function renderNearbyZones(map, feats) {
+  if (!map || !feats || feats.length === 0) return;
+  try {
+    const geoJsonFormat = new ol.format.GeoJSON();
+    const olFeatures = [];
+    const seenUnames = new Set();
+    feats.forEach(f => {
+      try {
+        if (!f.geometry) return;
+        const feat = geoJsonFormat.readFeature(f, { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:900913' });
+        const uname = (f.properties && f.properties.uname) || '';
+        const zs = getZoneStyle(uname);
+        feat.setStyle(new ol.style.Style({
+          fill: new ol.style.Fill({ color: zs.fill }),
+          stroke: new ol.style.Stroke({ color: zs.stroke, width: 1.5 })
+        }));
+        if (uname) seenUnames.add(uname);
+        olFeatures.push(feat);
+      } catch (e) {}
+    });
+    const layer = new ol.layer.Vector({ source: new ol.source.Vector({ features: olFeatures }) });
+    layer.set('appCustomLayer', true);
+    layer.setZIndex(50); // 지번(90)·강조(100)보다는 아래, 배경지도(최대 10)보다는 위
+    map.addLayer(layer);
+    renderZoneLegend(seenUnames);
+    if (map.renderSync) map.renderSync();
+  } catch (e) {
+    showDebug('용도지역 구역 그리기 실패', e.message);
+  }
+}
+
+// 화면에 실제로 표시된 구역 종류만 범례로 보여줌(네이버지도 지적편집도 참고, 2026-07-22)
+function renderZoneLegend(unames) {
+  const box = document.getElementById('mapZoneLegend');
+  if (!box) return;
+  if (!unames || unames.size === 0) { box.style.display = 'none'; return; }
+  const items = Array.from(unames).sort().map(u => {
+    const zs = getZoneStyle(u);
+    const swatchColor = zs.stroke.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/, 'rgb($1,$2,$3)');
+    return '<div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">'
+      + '<span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:' + zs.fill.replace(/[\d.]+\)$/, '0.9)') + '; border:1px solid ' + swatchColor + ';"></span>'
+      + '<span style="font-size:11px; color:var(--ink-deep);">' + u + '</span>'
+      + '</div>';
+  }).join('');
+  box.innerHTML = items;
+  box.style.display = 'block';
 }
 
 const parcelMapInstances = {};
@@ -5794,6 +5894,8 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
       }
     }, 0);
     parcelMapInstances[containerId] = map;
+    const legendBox = document.getElementById('mapZoneLegend');
+    if (legendBox) legendBox.style.display = 'none'; // 새 검색 시작 시 이전 범례 우선 숨김
     lookupNearbyParcels(parseFloat(x), parseFloat(y)).then(feats => {
       if (parcelMapInstances[containerId] === map) {
         renderNearbyParcels(map, feats);
@@ -5801,6 +5903,15 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
         const layers = map.getLayers();
         layers.remove(highlightLayer);
         layers.push(highlightLayer);
+        if (map.renderSync) map.renderSync();
+      }
+    });
+    lookupNearbyZones(parseFloat(x), parseFloat(y)).then(feats => {
+      if (parcelMapInstances[containerId] === map) {
+        renderNearbyZones(map, feats);
+        // 용도지역 색상 폴리곤이 새로 들어왔으니, 그 위에 그려져야 할 레이어들을 다시 맨 위로
+        const layers = map.getLayers();
+        layers.getArray().filter(l => l.get('appNearbyLayer') || l === highlightLayer).forEach(l => { layers.remove(l); layers.push(l); });
         if (map.renderSync) map.renderSync();
       }
     });
