@@ -5679,12 +5679,14 @@ function renderNearbyParcels(map, feats) {
         const feat = geoJsonFormat.readFeature(f, { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:900913' });
         const jibunLabel = (f.properties && f.properties.jibun) ? String(f.properties.jibun).replace(/[^0-9-]/g, '') : '';
         feat.setStyle(new ol.style.Style({
-          stroke: new ol.style.Stroke({ color: 'rgba(110,110,110,0.55)', width: 1 }),
+          // 위성(항공사진) 배경에서도 또렷이 보이도록 얇은 회색 대신 진한 남색+높은 불투명도로.
+          // 기존 회색 1px 55%는 위성사진 위에서 거의 안 보였음(Kevin 제보, 2026-07-22)
+          stroke: new ol.style.Stroke({ color: 'rgba(20,49,92,0.85)', width: 1.5 }),
           text: jibunLabel ? new ol.style.Text({
             text: jibunLabel,
-            font: '11px "IBM Plex Sans KR", sans-serif',
-            fill: new ol.style.Fill({ color: '#555' }),
-            stroke: new ol.style.Stroke({ color: '#fff', width: 3 })
+            font: '600 12px "IBM Plex Sans KR", sans-serif',
+            fill: new ol.style.Fill({ color: '#0B1E38' }),
+            stroke: new ol.style.Stroke({ color: '#fff', width: 3.5 })
           }) : undefined
         }));
         olFeatures.push(feat);
