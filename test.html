@@ -106,24 +106,37 @@
   }
   .recentSearchChip:hover{ border-color:var(--ink); background:var(--card-bg); }
   @media (min-width:1000px){
+    /* 플렉시티 참고(2026-07-22): 좌우 분할 대신 정보패널을 지도 위에 뜨는 카드로 바꿔서
+       지도가 뷰포트 전체 너비를 쓰게 함. .app-layout을 기준 좌표계로 두고 두 자식을
+       모두 절대배치 — .wrap은 떠 있는 카드, .app-map-panel은 풀블리드 배경 */
     html, body{ height:100%; overflow:hidden; }
     body{ padding:0; }
-    .app-layout{ flex-direction:row; align-items:stretch; height:100vh; }
+    .app-layout{ position:relative; height:100vh; }
     .app-layout .wrap{
-      flex:0 0 420px;
-      max-width:420px;
-      height:100%;
+      position:absolute;
+      top:20px; left:20px; bottom:20px;
+      width:400px;
+      max-width:calc(100% - 40px);
+      height:auto;
       overflow-y:auto;
-      padding:28px 20px 40px;
+      padding:24px 20px 32px;
+      background:var(--card-bg);
+      border:1.5px solid var(--ink);
+      border-radius:var(--radius);
+      box-shadow:0 12px 32px rgba(11,30,56,0.22);
+      z-index:40;
     }
     .app-map-panel{
+      position:absolute;
+      inset:0;
       margin-top:0;
-      flex:1 1 auto;
       height:100%;
-      min-width:0;
+      width:100%;
       border-radius:0;
-      border-width:0 0 0 1.5px;
+      border-width:0;
     }
+    /* 떠 있는 정보카드(좌측 상단)와 겹치지 않도록 지도 컨트롤을 우측 상단으로 이동 */
+    .mapBasemapSwitch{ left:auto; right:16px; }
   }
 
   /* Header */
