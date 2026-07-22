@@ -5321,26 +5321,34 @@ async function lookupParcel(addr) {
   const props = features[0].properties;
   const uname = props.uname, sido = props.sido_name, sigg = props.sigg_name;
 
-  let area = null, jimok = null;
+  // 아래 5개는 전부 PNU(item.id) 하나만 있으면 되는 완전히 독립적인 조회라, 순서대로 기다리지 않고
+  // Promise.all로 동시에 쏴서 전체 대기시간을 "제일 느린 것 하나" 수준으로 줄임(2026-07-22, Kevin이
+  // 검색이 느려졌다고 지적 — 원래 4개였던 순차 조회에 오늘 boundary/landPrice/floorInfo 3개가
+  // 추가되면서 체감 속도가 눈에 띄게 느려졌던 것으로 확인)
   const parcelUrl = 'https://api.vworld.kr/ned/data/ladfrlList'
     + '?pnu=' + item.id + '&format=json&numOfRows=10&pageNo=1'
     + '&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
-  try {
-    const parcelData = await vworldRequest(parcelUrl);
-    showDebug('③ 토지특성정보 조회 결과: ' + addr, parcelData);
-    const list = parcelData && parcelData.ladfrlVOList && parcelData.ladfrlVOList.ladfrlVOList;
-    if (list && list.length > 0 && list[0].lndpclAr) {
-      area = parseFloat(list[0].lndpclAr);
-      jimok = list[0].lndcgrCodeNm || '-';
-    }
-  } catch (e) {
-    showDebug('③ 대지면적 조회 실패: ' + addr, e.message);
-  }
-
-  const overlayRisks = await lookupOverlayRisks(item.id, addr);
-  const boundary = await lookupParcelBoundary(item.id, addr);
-  const landPrice = await lookupLandPrice(item.id, addr);
-  const floorInfo = await lookupFloorInfo(item.id, addr);
+  const [parcelAreaResult, overlayRisks, boundary, landPrice, floorInfo] = await Promise.all([
+    (async () => {
+      try {
+        const parcelData = await vworldRequest(parcelUrl);
+        showDebug('③ 토지특성정보 조회 결과: ' + addr, parcelData);
+        const list = parcelData && parcelData.ladfrlVOList && parcelData.ladfrlVOList.ladfrlVOList;
+        if (list && list.length > 0 && list[0].lndpclAr) {
+          return { area: parseFloat(list[0].lndpclAr), jimok: list[0].lndcgrCodeNm || '-' };
+        }
+        return { area: null, jimok: null };
+      } catch (e) {
+        showDebug('③ 대지면적 조회 실패: ' + addr, e.message);
+        return { area: null, jimok: null };
+      }
+    })(),
+    lookupOverlayRisks(item.id, addr),
+    lookupParcelBoundary(item.id, addr),
+    lookupLandPrice(item.id, addr),
+    lookupFloorInfo(item.id, addr)
+  ]);
+  const { area, jimok } = parcelAreaResult;
 
   return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary, landPrice, floorInfo };
 }
@@ -5671,7 +5679,7 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
 // 플렉시티 등처럼 처음부터 지도가 비어있지 않게. body 파싱 시점(스크립트 실행 시점)엔 flex 레이아웃이
 // 아직 확정 전이라 컨테이너 너비를 0으로 잘못 읽는 문제가 있어(실제 테스트로 확인, 2026-07-21),
 // 폰트·외부 리소스까지 전부 끝나는 window.onload까지 기다렸다가 그림
-window.addEventListener('load', () => { renderParcelMap('vmapMain', 126.9780, 37.5665, null, 11); });
+window.addEventListener('load', () => { renderParcelMap('vmapMain', 126.9780, 37.5665, null, 17); });
 
 // 배경지도(일반/위성) 전환 — vw.ol3.Map은 setBasemapType()으로 배경만 바꿀 수 있어 검색 결과(마커·
 // 경계선)나 확대 위치는 그대로 유지됨. 버튼 active 표시만 수동으로 토글
@@ -5736,10 +5744,9 @@ addrSearchBtn.addEventListener('click', async () => {
   addrSearchBtn.style.opacity = '0.7';
 
   try {
-    const results = [];
-    for (const addr of addrs) {
-      results.push(await lookupParcel(addr));
-    }
+    // 필지 여러 개(합필)를 순서대로 하나씩 기다리지 않고 한꺼번에 조회 — 결과 배열 순서는 addrs 순서와
+    // 동일하게 유지됨(Promise.all 특성)
+    const results = await Promise.all(addrs.map(addr => lookupParcel(addr)));
 
     const okResults = results.filter(r => r.ok);
     const failResults = results.filter(r => !r.ok);
