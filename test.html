@@ -135,8 +135,11 @@
       border-radius:0;
       border-width:0;
     }
-    /* 떠 있는 정보카드(좌측 상단)와 겹치지 않도록 지도 컨트롤을 우측 상단으로 이동 */
-    .mapBasemapSwitch{ left:auto; right:16px; }
+    /* 떠 있는 정보카드(좌측 상단, width:400px)와 안 겹치도록 카드 바로 오른쪽으로 이동.
+       우측 상단은 VWorld 자체 확대·나침반 컨트롤(vw-zoombar, z-index:100)이 이미 차지하고
+       있어서 거기 두면 클릭이 그 컨트롤에 가로채여 위성 전환이 안 되는 문제가 있었음(2026-07-22,
+       Kevin 제보 — 버튼을 눌러도 지도가 계속 아래로 밀리는 증상으로 나타남) */
+    .mapBasemapSwitch{ left:440px; }
   }
 
   /* Header */
