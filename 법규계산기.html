@@ -52,6 +52,43 @@
   }
   .wrap{max-width:760px;margin:0 auto;}
 
+  /* 전체 레이아웃 — 좌측 사이드바(.wrap, 기존 콘텐츠 전부)에 지도 패널을 배치.
+     플렉시티 등 경쟁 서비스의 "검색 패널+상시 지도" 구조를 참고해 2026-07-21 도입.
+     데스크탑(1000px 이상)은 좌우로 나란히 + 지도가 스크롤에 따라붙는 sticky.
+     모바일은 화면이 좁아 좌우 분할하면 둘 다 작아지므로, 세로로 이어 붙여서(사이드바 아래에
+     지도) 각자 화면 폭을 꽉 채우게 함 */
+  .app-layout{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    max-width:1400px;
+    margin:0 auto;
+  }
+  .app-layout .wrap{ margin:0; }
+  .app-map-panel{
+    margin-top:20px;
+    height:360px;
+    border:1.5px solid var(--ink);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .app-map-panel #vmapMain{ width:100%; height:100%; }
+  @media (min-width:1000px){
+    .app-layout{ flex-direction:row; align-items:flex-start; }
+    .app-layout .wrap{ flex:0 0 auto; }
+    .app-map-panel{
+      margin-top:0;
+      position:sticky;
+      top:20px;
+      flex:1 1 auto;
+      align-self:stretch;
+      height:auto;
+      min-height:calc(100vh - 40px);
+      min-width:380px;
+      margin-left:24px;
+    }
+  }
+
   /* Header */
   header{
     border:1.5px solid var(--ink);
@@ -210,54 +247,6 @@
   .result-grid-3{grid-template-columns:1fr 1fr 1fr;}
   @media (max-width:520px){ .result-grid-3{grid-template-columns:1fr;} }
 
-  /* 필지 위치 지도 — 데스크탑은 텍스트 정보 옆에 나란히(가로), 모바일은 아래에 작은 썸네일로 쌓이고
-     탭하면 전체화면으로 확대. 결과 카드 안 넓은 화면 공간을 그냥 낭비하지 않도록 좌우 배치가 기본값 */
-  .result-info-map-flex{
-    display:flex;
-    gap:16px;
-    align-items:stretch;
-    margin-top:10px;
-  }
-  .result-info-map-flex .result-info-text{
-    flex:1 1 240px;
-    font-size:14px;
-    line-height:1.8;
-  }
-  .parcel-map-wrap{
-    position:relative;
-    flex:1 1 300px;
-    min-width:0;
-    height:320px;
-    border:1.5px solid var(--paper-line-strong);
-    border-radius:8px;
-    overflow:hidden;
-    cursor:pointer;
-  }
-  .parcel-map-wrap #vmap{ width:100%; height:100%; }
-  .parcel-map-wrap .mapExpandHint{
-    position:absolute; right:8px; bottom:8px; z-index:5;
-    background:rgba(20,49,92,0.85); color:#fff; font-size:11.5px;
-    padding:4px 9px; border-radius:999px; pointer-events:none;
-  }
-  @media (max-width:520px){
-    .result-info-map-flex{ flex-direction:column; gap:10px; }
-    .parcel-map-wrap{ height:140px; }
-  }
-  .mapModalOverlay{
-    display:none; position:fixed; inset:0; z-index:9999;
-    background:rgba(0,0,0,0.55);
-  }
-  .mapModalOverlay.open{ display:block; }
-  .mapModalBox{
-    position:absolute; inset:0;
-    background:#fff;
-  }
-  .mapModalBox #vmapModal{ width:100%; height:100%; }
-  .mapModalCloseBtn{
-    position:absolute; top:10px; right:10px; z-index:10;
-    width:36px; height:36px; border-radius:50%; border:none;
-    background:var(--ink); color:#fff; font-size:18px; cursor:pointer;
-  }
   .result-card{
     border:1.5px solid var(--paper-line-strong);
     border-radius:8px;
@@ -338,6 +327,7 @@
 </style>
 </head>
 <body>
+<div class="app-layout">
 <div class="wrap">
 
   <header>
@@ -494,13 +484,11 @@
     ·
     <a href="#" id="privacyBtn" style="color:inherit; text-decoration:underline;">개인정보처리방침</a>
   </footer>
+</div>
 
-  <div class="mapModalOverlay" id="mapModalOverlay">
-    <div class="mapModalBox">
-      <button type="button" class="mapModalCloseBtn" id="mapModalCloseBtn">✕</button>
-      <div id="vmapModal"></div>
-    </div>
-  </div>
+<div class="app-map-panel">
+  <div id="vmapMain"></div>
+</div>
 </div>
 
 <div id="privacyModal" style="display:none; position:fixed; inset:0; background:rgba(11,30,56,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
@@ -5567,31 +5555,36 @@ async function lookupOverlayRisks(pnu, addr){
 // 초기화가 중간에 실패하고(zoom을 못 읽는 에러), 화면엔 확대/축소가 안 된 기본 지도(전 세계 축소본,
 // "한국 지도 전체"처럼 보임)만 남는 문제가 실제로 재현됨(2026-07-21)
 const parcelMapInstances = {};
-function renderParcelMap(containerId, x, y, boundary) {
+function renderParcelMap(containerId, x, y, boundary, initialZoom) {
   if (parcelMapInstances[containerId]) {
     try { parcelMapInstances[containerId].setTarget(null); } catch (e) {}
     parcelMapInstances[containerId] = null;
   }
   try {
     if (typeof vw === 'undefined' || !vw.ol3 || typeof ol === 'undefined') return null;
+    const zoom = initialZoom || 18;
     const center = ol.proj.transform([parseFloat(x), parseFloat(y)], 'EPSG:4326', 'EPSG:900913');
     const map = new vw.ol3.Map(containerId, {
       basemapType: vw.ol3.BasemapType.GRAPHIC,
       controlDensity: vw.ol3.DensityType.EMPTY,
       interactionDensity: vw.ol3.DensityType.BASIC,
       controlsAutoArrange: true,
-      homePosition: { center: center, zoom: 18, rotation: 0 },
-      initPosition: { center: center, zoom: 18, rotation: 0 }
+      homePosition: { center: center, zoom: zoom, rotation: 0 },
+      initPosition: { center: center, zoom: zoom, rotation: 0 }
     });
-    const marker = new ol.Feature({ geometry: new ol.geom.Point(center) });
-    marker.setStyle(new ol.style.Style({
-      image: new ol.style.Circle({
-        radius: 8,
-        fill: new ol.style.Fill({ color: '#D9622B' }),
-        stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
-      })
-    }));
-    const features = [marker];
+    // initialZoom이 넘어온 호출은 "검색 전 기본 화면"이라 마커 없이 지도만 보여줌(마커는 실제 검색 결과에만)
+    const features = [];
+    if (!initialZoom) {
+      const marker = new ol.Feature({ geometry: new ol.geom.Point(center) });
+      marker.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 8,
+          fill: new ol.style.Fill({ color: '#D9622B' }),
+          stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+        })
+      }));
+      features.push(marker);
+    }
 
     // 필지 경계선(연속지적도) — 조회에 성공한 경우에만 폴리곤 표시. GeoJSON은 위경도(EPSG:4326)로
     // 오므로 지도 좌표계(EPSG:900913)로 변환해서 읽어야 함(featureProjection 옵션이 이 변환을 대신 해줌)
@@ -5636,26 +5629,11 @@ function renderParcelMap(containerId, x, y, boundary) {
   }
 }
 
-function openMapModal(x, y, boundary) {
-  try {
-    document.getElementById('mapModalOverlay').classList.add('open');
-    // 모달은 열 때마다 컨테이너를 비우고 새로 그림(인스턴스 재사용보다 단순, 자주 여닫는 UI가 아니라 성능 부담 적음)
-    document.getElementById('vmapModal').innerHTML = '';
-    const map = renderParcelMap('vmapModal', x, y, boundary);
-    setTimeout(() => { if (map && map.renderSync) map.renderSync(); }, 100);
-  } catch (e) {
-    showDebug('지도 모달 열기 실패', e.message);
-  }
-}
-
-function closeMapModal() {
-  document.getElementById('mapModalOverlay').classList.remove('open');
-}
-
-document.getElementById('mapModalCloseBtn').addEventListener('click', closeMapModal);
-document.getElementById('mapModalOverlay').addEventListener('click', (e) => {
-  if (e.target.id === 'mapModalOverlay') closeMapModal();
-});
+// 페이지를 열자마자(검색 전) 지도 패널에 기본 화면(서울시청 부근, 도시 스케일)을 띄워둠 —
+// 플렉시티 등처럼 처음부터 지도가 비어있지 않게. body 파싱 시점(스크립트 실행 시점)엔 flex 레이아웃이
+// 아직 확정 전이라 컨테이너 너비를 0으로 잘못 읽는 문제가 있어(실제 테스트로 확인, 2026-07-21),
+// 폰트·외부 리소스까지 전부 끝나는 window.onload까지 기다렸다가 그림
+window.addEventListener('load', () => { renderParcelMap('vmapMain', 126.9780, 37.5665, null, 11); });
 
 addrSearchBtn.addEventListener('click', async () => {
   const addrInputs = Array.from(document.querySelectorAll('.addrInputRow'));
@@ -5776,8 +5754,7 @@ addrSearchBtn.addEventListener('click', async () => {
     if (addrs.length > 1) {
       html += '<div style="margin-top:8px;">' + rowsHtml + '</div>';
     }
-    html += '<div class="result-info-map-flex">';
-    html += '<div class="result-info-text">';
+    html += '<div style="font-size:14px; line-height:1.8;">';
     html += '📍 ' + first.sido + ' ' + first.sigg + '<br>';
     html += '🏷️ 용도지역: <b>' + (zoneConsistent ? first.uname : unames.join(' / ') + ' (필지마다 다름)') + '</b>' +
       (combinedRisks.length > 0 ? ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">· ' + combinedRisks.map(r => r.label).join(', ') + '</span>' : '') +
@@ -5799,10 +5776,6 @@ addrSearchBtn.addEventListener('click', async () => {
         (floorParts.length > 0 ? ' (' + floorParts.join(' · ') + ')' : '') +
         (fi.mainPurpose ? ', 주용도: ' + fi.mainPurpose : '') +
         '<br><span style="font-size:12px; color:var(--text-muted);">건축물대장 층별개요 기준' + (fi.approxOnly ? ' · 세대수가 많아 일부 데이터만 조회됨' : '') + (addrs.length > 1 ? ' · 첫 필지 기준' : '') + '</span></div>';
-    }
-    // 필지 여러 개(합필)여도 지도는 첫 번째 필지 위치만 표시(단순화) — 좌표가 없으면(검색 API 응답에 point 누락 등) 조용히 생략
-    if (first.x && first.y) {
-      html += '<div class="parcel-map-wrap" id="parcelMapWrap"><div id="vmap"></div><div class="mapExpandHint">🔍 눌러서 크게 보기</div></div>';
     }
     html += '</div>';
     html += '</div>';
@@ -5835,10 +5808,9 @@ addrSearchBtn.addEventListener('click', async () => {
 
     addrResultBox.style.display = 'block';
     addrResultBox.innerHTML = html;
+    // 지도는 이제 결과 카드 안이 아니라 페이지 상시 지도 패널(#vmapMain)에 표시 — 검색될 때마다 그 위치로 갱신
     if (first.x && first.y) {
-      renderParcelMap('vmap', first.x, first.y, first.boundary);
-      const wrapEl = document.getElementById('parcelMapWrap');
-      if (wrapEl) wrapEl.addEventListener('click', () => openMapModal(first.x, first.y, first.boundary));
+      renderParcelMap('vmapMain', first.x, first.y, first.boundary);
     }
 
     // 지역/용도지역/대지면적 자동 반영
