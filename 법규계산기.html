@@ -5567,9 +5567,12 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
     if (typeof vw === 'undefined' || !vw.ol3 || typeof ol === 'undefined') return null;
     const zoom = initialZoom || 18;
     const center = ol.proj.transform([parseFloat(x), parseFloat(y)], 'EPSG:4326', 'EPSG:900913');
+    // controlDensity FULL — 줌 버튼·배경지도(레이어) 전환 등 지도 조작 UI를 켬(플렉시티 등 참고,
+    // 2026-07-22). 이전엔 EMPTY라 사용자가 확대/축소·레이어 전환을 전혀 못 하고 딱 검색된 확대
+    // 상태로만 보여서 답답했음
     const map = new vw.ol3.Map(containerId, {
       basemapType: vw.ol3.BasemapType.GRAPHIC,
-      controlDensity: vw.ol3.DensityType.EMPTY,
+      controlDensity: vw.ol3.DensityType.FULL,
       interactionDensity: vw.ol3.DensityType.BASIC,
       controlsAutoArrange: true,
       homePosition: { center: center, zoom: zoom, rotation: 0 },
