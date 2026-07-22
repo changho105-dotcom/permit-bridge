@@ -70,6 +70,7 @@
   }
   .app-layout .wrap{ margin:0; }
   .app-map-panel{
+    position:relative;
     margin-top:20px;
     height:360px;
     border:1.5px solid var(--ink);
@@ -77,6 +78,26 @@
     overflow:hidden;
   }
   .app-map-panel #vmapMain{ width:100%; height:100%; }
+  /* 배경지도(일반/위성) 전환 버튼 — 지도 좌측 상단, VWorld 자체 컨트롤과 안 겹치는 위치 */
+  .mapBasemapSwitch{
+    position:absolute; top:12px; left:12px; z-index:50;
+    display:flex; border:1.5px solid var(--ink); border-radius:8px; overflow:hidden;
+    background:#fff;
+  }
+  .mapBasemapBtn{
+    border:none; background:transparent; padding:7px 14px; font-size:13px;
+    font-family:'IBM Plex Sans KR', sans-serif; color:var(--ink-deep); cursor:pointer;
+  }
+  .mapBasemapBtn + .mapBasemapBtn{ border-left:1.5px solid var(--ink); }
+  .mapBasemapBtn.active{ background:var(--ink); color:#fff; font-weight:600; }
+  /* 상담 신청 플로팅 버튼 — 검색 결과가 있을 때만 노출(display:none이 기본), 지도 위에 항상 눈에 띄게 */
+  .mapConsultFab{
+    position:absolute; right:16px; bottom:16px; z-index:50;
+    padding:13px 22px; border:none; border-radius:999px;
+    background:var(--accent); color:#fff; font-size:14px; font-weight:600;
+    font-family:'IBM Plex Sans KR', sans-serif; cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,0.25);
+  }
   @media (min-width:1000px){
     html, body{ height:100%; overflow:hidden; }
     body{ padding:0; }
@@ -497,6 +518,11 @@
 
 <div class="app-map-panel">
   <div id="vmapMain"></div>
+  <div class="mapBasemapSwitch" id="mapBasemapSwitch">
+    <button type="button" class="mapBasemapBtn active" data-basemap="GRAPHIC">일반</button>
+    <button type="button" class="mapBasemapBtn" data-basemap="PHOTO_HYBRID">위성</button>
+  </div>
+  <button type="button" class="mapConsultFab" id="mapConsultFab" style="display:none;">건축사 상담 신청하기</button>
 </div>
 </div>
 
@@ -5647,6 +5673,31 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
 // 폰트·외부 리소스까지 전부 끝나는 window.onload까지 기다렸다가 그림
 window.addEventListener('load', () => { renderParcelMap('vmapMain', 126.9780, 37.5665, null, 11); });
 
+// 배경지도(일반/위성) 전환 — vw.ol3.Map은 setBasemapType()으로 배경만 바꿀 수 있어 검색 결과(마커·
+// 경계선)나 확대 위치는 그대로 유지됨. 버튼 active 표시만 수동으로 토글
+document.querySelectorAll('.mapBasemapBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const map = parcelMapInstances['vmapMain'];
+    if (!map || !map.setBasemapType) return;
+    try {
+      map.setBasemapType(vw.ol3.BasemapType[btn.dataset.basemap]);
+      document.querySelectorAll('.mapBasemapBtn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    } catch (e) {
+      showDebug('배경지도 전환 실패', e.message);
+    }
+  });
+});
+
+// 지도 위 "건축사 상담 신청하기" 플로팅 버튼 — 검색 결과가 나온 뒤에만 노출(addrSearchBtn 핸들러에서
+// display:block으로 켬). 클릭하면 사이드바 안의 실제 상담 폼으로 스크롤 이동 + 이름 입력칸에 포커스
+document.getElementById('mapConsultFab').addEventListener('click', () => {
+  const label = document.getElementById('consultLabel');
+  if (label) label.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const nameInput = document.getElementById('consultName');
+  if (nameInput) setTimeout(() => nameInput.focus(), 400);
+});
+
 // 브라우저 창 크기 변경(최대화/복원, 드래그 리사이즈) 시 지도 캔버스가 안 따라오는 문제 방지 —
 // renderSync가 컨테이너의 현재 크기를 다시 읽어서 캔버스를 갱신함(디바운스로 과호출 방지)
 let resizeDebounce = null;
@@ -5835,6 +5886,8 @@ addrSearchBtn.addEventListener('click', async () => {
     if (first.x && first.y) {
       renderParcelMap('vmapMain', first.x, first.y, first.boundary);
     }
+    // 검색 결과가 생겨야 상담 신청이 의미 있으므로, 지도 위 플로팅 버튼도 이 시점에 처음 노출
+    document.getElementById('mapConsultFab').style.display = 'block';
 
     // 지역/용도지역/대지면적 자동 반영
     // 서울이 아니면 전부 GYEONGGI 참고표(21개 용도지역 전체 포함)로 zoneSel을 채움 — 예전엔 경기/인천만
