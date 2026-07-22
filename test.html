@@ -5665,31 +5665,25 @@ async function lookupOverlayRisks(pnu, addr){
 // 새로 만들 때마다 false로 리셋됨(renderParcelMap 참고)
 let mapBasemapIsPhoto = false;
 
-// 용도지역·용도지구·용도구역 색상 구역 표시(네이버지도 지적편집도 참고, 2026-07-22) — 국토교통부
-// 표준 배색 계열을 근사해서 구역명(uname) 텍스트를 키워드로 매칭. 정확한 법정 고시 색상표는 아니고
-// 육안 구분용 근사 배색이므로, 실제 규제 판정은 여기 색이 아니라 기존 조회 결과(overlayRisks 등)를
-// 따를 것 — 이 레이어는 어디까지나 시각 참고용.
-// 색상은 Kevin이 보내준 플렉시티(네이버지도 기반) 실제 화면 스크린샷을 보고 재조정함(2026-07-22) —
-// 처음 만든 색은 채도가 너무 높아서(선명한 노랑·초록 등) "네이버랑 다르다"는 피드백을 받음. 실제
-// 네이버 지적편집도는 훨씬 옅고 채도 낮은 파스텔톤이었고(주거=크림빛 아이보리, 녹지=올리브빛 연두),
-// 개발제한구역·지구단위계획구역 같은 "구역"류는 색칠 없이 점선 테두리만 있었음
+// 용도지구·용도구역 경계 표시(네이버지도 "지적도" 참고, 2026-07-22) — 처음엔 용도지역(주거·상업 등)
+// 4단계도 넓은 색면으로 칠했는데, 실제 네이버는 그 대신 필지 하나하나를 지목으로 칠하고(→
+// getJimokFillColor·nearbyParcelStyle) 용도지구·구역은 칠 없이 점선 테두리만 얹는 방식이었음
+// (Kevin이 보내준 실제 화면 재대조, 2026-07-22). 그래서 용도지역 4단계(주거/상업/공업/녹지 등)는
+// 색칠을 끄고, 개발제한구역·지구단위계획구역 같은 "구역"류 점선 테두리만 남김.
+// 정확한 법정 고시 색상표가 아닌 육안 구분용 근사이며, 실제 규제 판정은 여기 색이 아니라 기존
+// 조회 결과(overlayRisks 등)를 따를 것
 function getZoneStyle(uname) {
-  if (!uname) return { fill: 'rgba(200,200,200,0.2)', stroke: 'rgba(150,150,150,0.4)' };
-  if (uname.includes('전용주거')) return { fill: 'rgba(246,241,214,0.75)', stroke: 'rgba(215,202,150,0.55)' };
-  if (uname.includes('주거')) return { fill: 'rgba(243,238,210,0.78)', stroke: 'rgba(210,197,145,0.55)' };
-  if (uname.includes('상업')) return { fill: 'rgba(248,205,205,0.55)', stroke: 'rgba(222,150,150,0.55)' };
-  if (uname.includes('공업')) return { fill: 'rgba(215,200,235,0.55)', stroke: 'rgba(175,155,215,0.55)' };
-  if (uname.includes('녹지')) return { fill: 'rgba(201,216,131,0.55)', stroke: 'rgba(165,182,95,0.5)' };
-  if (uname.includes('관리지역')) return { fill: 'rgba(224,213,158,0.5)', stroke: 'rgba(190,175,110,0.5)' };
-  if (uname.includes('농림')) return { fill: 'rgba(196,206,132,0.5)', stroke: 'rgba(155,165,85,0.5)' };
-  if (uname.includes('자연환경보전')) return { fill: 'rgba(165,197,178,0.5)', stroke: 'rgba(115,155,135,0.5)' };
-  if (uname.includes('취락')) return { fill: 'rgba(255,222,183,0.4)', stroke: 'rgba(225,170,110,0.6)' };
+  const NONE = { fill: 'rgba(0,0,0,0)', stroke: 'rgba(0,0,0,0)' };
+  if (!uname) return NONE;
+  if (uname.includes('주거') || uname.includes('상업') || uname.includes('공업') || uname.includes('녹지')
+    || uname.includes('관리지역') || uname.includes('농림') || uname.includes('자연환경보전')) return NONE;
+  if (uname.includes('취락')) return { fill: 'rgba(0,0,0,0)', stroke: 'rgba(225,170,110,0.7)', dash: [4, 3] };
   // "구역"류(개발제한·지구단위계획·재정비촉진·거래허가 등)는 네이버처럼 칠 없이 점선 테두리만
   if (uname.includes('개발제한')) return { fill: 'rgba(0,0,0,0)', stroke: 'rgba(70,70,70,0.8)', dash: [6, 4] };
   if (uname.includes('지구단위계획') || uname.includes('재정비촉진')) return { fill: 'rgba(0,0,0,0)', stroke: 'rgba(220,80,140,0.75)', dash: [5, 3] };
   if (uname.includes('거래') || uname.includes('허가구역')) return { fill: 'rgba(0,0,0,0)', stroke: 'rgba(230,150,60,0.6)', dash: [4, 3] };
   if (uname.includes('경관') || uname.includes('고도') || uname.includes('방화') || uname.includes('방재') || uname.includes('보호')) return { fill: 'rgba(0,0,0,0)', stroke: 'rgba(110,110,170,0.5)', dash: [3, 3] };
-  return { fill: 'rgba(200,200,200,0.2)', stroke: 'rgba(150,150,150,0.4)' };
+  return NONE;
 }
 
 // 용도지역(LT_C_UQ111~114) + 주요 용도지구·용도구역(경관/고도/방화/방재/취락/개발제한/지구단위계획 등)을
@@ -5730,13 +5724,35 @@ async function lookupNearbyParcels(x, y) {
   }
 }
 
+// 지목(地目)별 색상 — 네이버지도 "지적도" 모드는 용도지역 단위가 아니라 필지 하나하나를 지목
+// 기준으로 칠함(임야=초록, 대지=노랑 등). Kevin이 보내준 실제 네이버 지적도 스크린샷 육안 대조로
+// 재조정(2026-07-22) — 처음엔 용도지역(zone) 단위 색칠만 했는데 "네이버는 필지 하나하나가
+// 다르게 칠해져 있다"는 취지로 다시 비교해주심. 21개 법정 지목 중 실제 화면에 자주 보이는 것 위주
+function getJimokFillColor(jimok) {
+  switch (jimok) {
+    case '임': return 'rgba(196,214,140,0.65)'; // 임야
+    case '대': return 'rgba(247,215,110,0.7)';  // 대지(건축물 부지)
+    case '전': return 'rgba(224,196,140,0.55)'; // 밭
+    case '답': return 'rgba(206,220,150,0.55)'; // 논
+    case '과': return 'rgba(210,205,120,0.55)'; // 과수원
+    case '도': return 'rgba(225,225,225,0.45)'; // 도로
+    case '구': case '하': return 'rgba(175,205,225,0.55)'; // 구거·하천
+    case '유': return 'rgba(150,190,220,0.55)'; // 유지(저수지)
+    case '잡': return 'rgba(210,200,190,0.45)'; // 잡종지
+    case '공': return 'rgba(215,225,205,0.45)'; // 공원
+    default: return 'rgba(215,215,205,0.4)';
+  }
+}
+
 // 배경지도에 따라 다른 스타일로 그림(2026-07-22, Kevin 제보 반영):
-// - 위성(항공사진): 대부분 어두운 배경이라 밝은 흰색 선·글씨가 잘 보임 + 원래 지번 라벨이 없어서 필요
-// - 일반(GRAPHIC): 자체 타일에 이미 지번 숫자가 있어 라벨은 생략(중복 방지), 경계선만 옅게 보조로
+// - 위성(항공사진): 사진이 이미 있어 지목 색칠은 옅게, 경계·라벨은 밝은 흰색으로 또렷하게
+// - 일반(GRAPHIC): 지목별 색칠(네이버 지적도 참고) + 지번(지목 글자 포함) 라벨
 function nearbyParcelStyle(feature) {
   const jibunLabel = feature.get('jibunLabel');
+  const jimokFill = getJimokFillColor(feature.get('jimok'));
   if (mapBasemapIsPhoto) {
     return new ol.style.Style({
+      fill: new ol.style.Fill({ color: jimokFill.replace(/[\d.]+\)$/, '0.25)') }),
       stroke: new ol.style.Stroke({ color: 'rgba(255,255,255,0.9)', width: 1.5 }),
       text: jibunLabel ? new ol.style.Text({
         text: jibunLabel,
@@ -5747,7 +5763,16 @@ function nearbyParcelStyle(feature) {
     });
   }
   return new ol.style.Style({
-    stroke: new ol.style.Stroke({ color: 'rgba(20,49,92,0.35)', width: 1 })
+    fill: new ol.style.Fill({ color: jimokFill }),
+    // 필지 사이 경계선 — 네이버 지적도 실제 화면 대조 결과 순백색보다 살짝 따뜻한 아이보리색이고
+    // 더 또렷하게 보여서 불투명도·두께를 올림(2026-07-22, Kevin 지적: "경계선 색상과 진한 정도도 중요")
+    stroke: new ol.style.Stroke({ color: 'rgba(255,251,235,0.95)', width: 1.3 }),
+    text: jibunLabel ? new ol.style.Text({
+      text: jibunLabel,
+      font: '11px "IBM Plex Sans KR", sans-serif',
+      fill: new ol.style.Fill({ color: '#8B2E2E' }),
+      stroke: new ol.style.Stroke({ color: 'rgba(255,255,255,0.85)', width: 2.5 })
+    }) : undefined
   });
 }
 
@@ -5759,8 +5784,12 @@ function renderNearbyParcels(map, feats) {
     feats.forEach(f => {
       try {
         const feat = geoJsonFormat.readFeature(f, { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:900913' });
-        const jibunLabel = (f.properties && f.properties.jibun) ? String(f.properties.jibun).replace(/[^0-9-]/g, '') : '';
-        feat.set('jibunLabel', jibunLabel);
+        // VWorld의 jibun 필드는 "83대"처럼 지번+지목 글자가 붙어서 옴 — 네이버 지적도처럼 지목 글자까지
+        // 라벨에 포함하고, 마지막 한 글자를 지목으로 분리해서 지목별 색칠에 사용(2026-07-22)
+        const rawJibun = (f.properties && f.properties.jibun) ? String(f.properties.jibun).trim() : '';
+        const jimokMatch = rawJibun.match(/([가-힣])$/);
+        feat.set('jibunLabel', rawJibun);
+        feat.set('jimok', jimokMatch ? jimokMatch[1] : '');
         feat.set('addr', f.properties && f.properties.addr);
         olFeatures.push(feat);
       } catch (e) {}
@@ -5823,7 +5852,8 @@ function renderNearbyZones(map, feats) {
           fill: new ol.style.Fill({ color: zs.fill }),
           stroke: new ol.style.Stroke({ color: zs.stroke, width: zs.dash ? 1.5 : 1, lineDash: zs.dash || undefined })
         }));
-        if (uname) seenUnames.add(uname);
+        // 색·테두리 둘 다 투명(용도지역 4단계 등 지금은 안 그리는 항목)이면 범례에도 안 올림
+        if (uname && (zs.fill !== 'rgba(0,0,0,0)' || zs.stroke !== 'rgba(0,0,0,0)')) seenUnames.add(uname);
         olFeatures.push(feat);
       } catch (e) {}
     });
