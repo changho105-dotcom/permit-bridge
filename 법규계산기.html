@@ -5629,6 +5629,54 @@ async function lookupOverlayRisks(pnu, addr){
 // 끊어줘야 함 — 안 끊으면 검색을 여러 번 하거나 지도 모달을 여러 번 여닫을 때 내부 상태가 꼬여서
 // 초기화가 중간에 실패하고(zoom을 못 읽는 에러), 화면엔 확대/축소가 안 된 기본 지도(전 세계 축소본,
 // "한국 지도 전체"처럼 보임)만 남는 문제가 실제로 재현됨(2026-07-21)
+// 주변 필지 지번 표시(플렉시티 참고, 2026-07-22) — 연속지적도(LP_PA_CBND_BUBUN)를 검색 필지 하나가
+// 아니라 주변 bbox로 조회해서 지번 라벨과 함께 그림. 지도 렌더링을 막지 않도록 항상 fire-and-forget로
+// 호출하고, 응답이 늦게 와도 그 사이 다른 검색으로 컨테이너가 재사용됐으면 버림(race condition 방지)
+async function lookupNearbyParcels(x, y) {
+  const d = 0.0018; // 대략 반경 180~200m
+  const bbox = (x - d) + ',' + (y - d) + ',' + (x + d) + ',' + (y + d);
+  const url = 'https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LP_PA_CBND_BUBUN&geomFilter=BOX(' + bbox + ')&format=json&geometry=true&crs=EPSG:4326&size=300&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
+  try {
+    const data = await vworldRequest(url);
+    const status = data && data.response && data.response.status;
+    const feats = status === 'OK' && data.response.result.featureCollection.features;
+    return feats || [];
+  } catch (e) {
+    showDebug('주변 지번 조회 실패', e.message);
+    return [];
+  }
+}
+
+function renderNearbyParcels(map, feats) {
+  if (!map || !feats || feats.length === 0) return;
+  try {
+    const geoJsonFormat = new ol.format.GeoJSON();
+    const olFeatures = [];
+    feats.forEach(f => {
+      try {
+        const feat = geoJsonFormat.readFeature(f, { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:900913' });
+        const jibunLabel = (f.properties && f.properties.jibun) ? String(f.properties.jibun).replace(/[^0-9-]/g, '') : '';
+        feat.setStyle(new ol.style.Style({
+          stroke: new ol.style.Stroke({ color: 'rgba(110,110,110,0.55)', width: 1 }),
+          text: jibunLabel ? new ol.style.Text({
+            text: jibunLabel,
+            font: '11px "IBM Plex Sans KR", sans-serif',
+            fill: new ol.style.Fill({ color: '#555' }),
+            stroke: new ol.style.Stroke({ color: '#fff', width: 3 })
+          }) : undefined
+        }));
+        olFeatures.push(feat);
+      } catch (e) {}
+    });
+    const layer = new ol.layer.Vector({ source: new ol.source.Vector({ features: olFeatures }) });
+    // 검색 필지 강조(주황) 레이어보다 아래에 깔리도록 배경지도 바로 위(index 1)에 삽입
+    if (map.getLayers) map.getLayers().insertAt(1, layer); else map.addLayer(layer);
+    if (map.renderSync) map.renderSync();
+  } catch (e) {
+    showDebug('주변 지번 그리기 실패', e.message);
+  }
+}
+
 const parcelMapInstances = {};
 function renderParcelMap(containerId, x, y, boundary, initialZoom) {
   if (parcelMapInstances[containerId]) {
@@ -5700,6 +5748,9 @@ function renderParcelMap(containerId, x, y, boundary, initialZoom) {
       }
     }, 0);
     parcelMapInstances[containerId] = map;
+    lookupNearbyParcels(parseFloat(x), parseFloat(y)).then(feats => {
+      if (parcelMapInstances[containerId] === map) renderNearbyParcels(map, feats);
+    });
     return map;
   } catch (e) {
     showDebug('지도 표시 실패(' + containerId + ')', e.message);
