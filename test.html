@@ -5311,19 +5311,30 @@ async function lookupParcel(addr) {
     { id: 'LT_C_UQ114', label: '자연환경보전지역' },
   ];
 
-  let features = null;
-  for (const layer of zoneLayers) {
+  // 4개 레이어(도시/관리/농림/자연환경보전지역)를 하나씩 순서대로 기다리지 않고 동시에 조회 —
+  // 한 필지는 이 중 정확히 하나에만 속하므로 앞의 3개가 전부 "없음"으로 끝나야 4번째까지 가던
+  // 기존 순차 방식은 도시지역이 아닌 부지에서 특히 느렸음(2026-07-22, 검색 속도 추가 개선)
+  const zoneResults = await Promise.all(zoneLayers.map(async (layer) => {
     const zoneUrl = 'https://api.vworld.kr/req/data'
       + '?service=data&request=GetFeature&data=' + layer.id
       + '&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN
       + '&format=json&geometry=false'
       + '&geomFilter=POINT(' + x + '%20' + y + ')';
-    let zoneData;
-    try { zoneData = await vworldRequest(zoneUrl); } catch (e) { showDebug('② ' + layer.label + ' 조회 실패', e.message); continue; }
-    showDebug('② ' + layer.label + ' 조회 결과: ' + addr, zoneData);
-    const zoneStatus = zoneData && zoneData.response && zoneData.response.status;
-    const f = zoneStatus === 'OK' && zoneData.response.result.featureCollection.features;
-    if (f && f.length > 0) { features = f; break; }
+    try {
+      const zoneData = await vworldRequest(zoneUrl);
+      showDebug('② ' + layer.label + ' 조회 결과: ' + addr, zoneData);
+      const zoneStatus = zoneData && zoneData.response && zoneData.response.status;
+      const f = zoneStatus === 'OK' && zoneData.response.result.featureCollection.features;
+      return (f && f.length > 0) ? f : null;
+    } catch (e) {
+      showDebug('② ' + layer.label + ' 조회 실패', e.message);
+      return null;
+    }
+  }));
+  // 우선순위(도시지역 > 관리지역 > 농림지역 > 자연환경보전지역)는 zoneLayers 배열 순서 그대로 유지
+  let features = null;
+  for (const f of zoneResults) {
+    if (f) { features = f; break; }
   }
 
   if (!features || features.length === 0) {
@@ -5333,14 +5344,17 @@ async function lookupParcel(addr) {
   const props = features[0].properties;
   const uname = props.uname, sido = props.sido_name, sigg = props.sigg_name;
 
-  // 아래 5개는 전부 PNU(item.id) 하나만 있으면 되는 완전히 독립적인 조회라, 순서대로 기다리지 않고
+  // 아래 4개는 전부 PNU(item.id) 하나만 있으면 되는 완전히 독립적인 조회라, 순서대로 기다리지 않고
   // Promise.all로 동시에 쏴서 전체 대기시간을 "제일 느린 것 하나" 수준으로 줄임(2026-07-22, Kevin이
-  // 검색이 느려졌다고 지적 — 원래 4개였던 순차 조회에 오늘 boundary/landPrice/floorInfo 3개가
-  // 추가되면서 체감 속도가 눈에 띄게 느려졌던 것으로 확인)
+  // 검색이 느려졌다고 지적).
+  // floorInfo(건축HUB 층별개요, data.go.kr)는 여기서 빠짐 — 실측 결과 이것만 유독 3초 이상 걸려서
+  // (나머지는 전부 100ms 이내) Promise.all에 같이 넣으면 그 시간에 발목 잡힘. 대신 await 없이 promise
+  // 그대로 반환해서 나머지 결과부터 먼저 화면에 보여주고, floorInfo는 도착하는 대로 나중에 채워넣는
+  // 방식으로 전환(addrSearchBtn 핸들러 쪽에서 처리)
   const parcelUrl = 'https://api.vworld.kr/ned/data/ladfrlList'
     + '?pnu=' + item.id + '&format=json&numOfRows=10&pageNo=1'
     + '&key=' + VWORLD_KEY + '&domain=' + VWORLD_DOMAIN;
-  const [parcelAreaResult, overlayRisks, boundary, landPrice, floorInfo] = await Promise.all([
+  const [parcelAreaResult, overlayRisks, boundary, landPrice] = await Promise.all([
     (async () => {
       try {
         const parcelData = await vworldRequest(parcelUrl);
@@ -5357,17 +5371,29 @@ async function lookupParcel(addr) {
     })(),
     lookupOverlayRisks(item.id, addr),
     lookupParcelBoundary(item.id, addr),
-    lookupLandPrice(item.id, addr),
-    lookupFloorInfo(item.id, addr)
+    lookupLandPrice(item.id, addr)
   ]);
   const { area, jimok } = parcelAreaResult;
+  const floorInfoPromise = lookupFloorInfo(item.id, addr);
 
-  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary, landPrice, floorInfo };
+  return { addr, ok: true, pnu: item.id, uname, sido, sigg, area, jimok, overlayRisks, x: item.point.x, y: item.point.y, boundary, landPrice, floorInfoPromise };
 }
 
 // 기존 건축물 층별개요(현황) — 건축HUB(data.go.kr) getBrFlrOulnInfo API, 별도 인증키 신청함(DATA_GO_KR_KEY).
 // 나대지(빈 땅)에는 애초에 데이터가 없는 게 정상이라 그 경우 조용히 null 반환. 세대수 많은 대단지 아파트는
 // 층별 데이터가 수백 건이라 한 페이지(100건)로 다 못 가져올 수 있어 "최소 이 정도"로만 요약해서 보여줌
+// floorInfo 데이터를 결과 카드용 HTML로 변환 — addrSearchBtn 핸들러에서 floorInfoPromise가 도착했을 때
+// #floorInfoSlot을 채우는 데 사용(결과 렌더링 코드 안에 인라인으로 있던 걸 재사용 가능하게 분리)
+function renderFloorInfoHtml(fi, isMulti) {
+  const floorParts = [];
+  if (fi.maxGroundFloor) floorParts.push('지상 ' + fi.maxGroundFloor + (fi.approxOnly ? '층 이상' : '층'));
+  if (fi.maxUndergroundFloor) floorParts.push('지하 ' + fi.maxUndergroundFloor + (fi.approxOnly ? '층 이상' : '층'));
+  return '<div class="note-box"><b>기존 건축물이 있습니다</b>' + (fi.bldNm ? ' — ' + fi.bldNm : '') +
+    (floorParts.length > 0 ? ' (' + floorParts.join(' · ') + ')' : '') +
+    (fi.mainPurpose ? ', 주용도: ' + fi.mainPurpose : '') +
+    '<br><span style="font-size:12px; color:var(--text-muted);">건축물대장 층별개요 기준' + (fi.approxOnly ? ' · 세대수가 많아 일부 데이터만 조회됨' : '') + (isMulti ? ' · 첫 필지 기준' : '') + '</span></div>';
+}
+
 async function lookupFloorInfo(pnu, addr) {
   const sigunguCd = pnu.substring(0, 5);
   const bjdongCd = pnu.substring(5, 10);
@@ -5908,17 +5934,9 @@ addrSearchBtn.addEventListener('click', async () => {
         ' <span style="font-weight:400; font-size:12.5px; color:var(--text-muted);">(' + first.landPrice.year + '년 기준' + (addrs.length > 1 ? ', 첫 필지 기준' : '') + ')</span>';
     }
     html += '</div>';
-    // 기존 건축물이 있는 필지에만 나오는 정보(나대지는 조회 결과 자체가 없어 조용히 생략됨) — 첫 번째 필지 기준
-    if (first.floorInfo) {
-      const fi = first.floorInfo;
-      const floorParts = [];
-      if (fi.maxGroundFloor) floorParts.push('지상 ' + fi.maxGroundFloor + (fi.approxOnly ? '층 이상' : '층'));
-      if (fi.maxUndergroundFloor) floorParts.push('지하 ' + fi.maxUndergroundFloor + (fi.approxOnly ? '층 이상' : '층'));
-      html += '<div class="note-box"><b>기존 건축물이 있습니다</b>' + (fi.bldNm ? ' — ' + fi.bldNm : '') +
-        (floorParts.length > 0 ? ' (' + floorParts.join(' · ') + ')' : '') +
-        (fi.mainPurpose ? ', 주용도: ' + fi.mainPurpose : '') +
-        '<br><span style="font-size:12px; color:var(--text-muted);">건축물대장 층별개요 기준' + (fi.approxOnly ? ' · 세대수가 많아 일부 데이터만 조회됨' : '') + (addrs.length > 1 ? ' · 첫 필지 기준' : '') + '</span></div>';
-    }
+    // 기존 건축물 층별개요는 조회가 느려서(3초+) 별도로 분리했으므로, 여기선 빈 슬롯만 만들어두고
+    // 아래에서 floorInfoPromise가 도착하면 채워넣음 — 나머지 정보는 기다리지 않고 먼저 보여줌
+    html += '<div id="floorInfoSlot"></div>';
     html += '</div>';
     html += '</div>';
 
@@ -5950,6 +5968,15 @@ addrSearchBtn.addEventListener('click', async () => {
 
     addrResultBox.style.display = 'block';
     addrResultBox.innerHTML = html;
+    // 층별개요(건축HUB API)는 조회가 유독 느려서(실측 3초+) 나머지 결과와 분리해 별도로 기다림 —
+    // 도착하면 그때 #floorInfoSlot을 채움. 이 사이 다른 검색이 또 실행돼서 addrResultBox가 통째로
+    // 바뀌었을 수 있으니, slot이 그때도 여전히 DOM에 붙어있는지 확인 후 채움(안 붙어있으면 조용히 무시)
+    if (first.floorInfoPromise) {
+      first.floorInfoPromise.then(fi => {
+        const slot = document.getElementById('floorInfoSlot');
+        if (slot && fi) slot.innerHTML = renderFloorInfoHtml(fi, addrs.length > 1);
+      });
+    }
     // 지도는 이제 결과 카드 안이 아니라 페이지 상시 지도 패널(#vmapMain)에 표시 — 검색될 때마다 그 위치로 갱신
     if (first.x && first.y) {
       renderParcelMap('vmapMain', first.x, first.y, first.boundary);
