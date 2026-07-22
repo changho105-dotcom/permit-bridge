@@ -5756,6 +5756,7 @@ function renderNearbyParcels(map, feats) {
         const feat = geoJsonFormat.readFeature(f, { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:900913' });
         const jibunLabel = (f.properties && f.properties.jibun) ? String(f.properties.jibun).replace(/[^0-9-]/g, '') : '';
         feat.set('jibunLabel', jibunLabel);
+        feat.set('addr', f.properties && f.properties.addr);
         olFeatures.push(feat);
       } catch (e) {}
     });
@@ -5771,6 +5772,30 @@ function renderNearbyParcels(map, feats) {
     layer.setZIndex(90);
     map.addLayer(layer); // 맨 위에 추가 — 검색 필지 강조 레이어는 아래에서 다시 맨 위로 재배치
     if (map.renderSync) map.renderSync();
+
+    // 이웃 지번 클릭 시 그 필지 주소로 바로 재검색(2026-07-22, Kevin 요청) — 지도에 새로 지도를
+    // 만들 때마다(renderParcelMap) map 인스턴스가 매번 새로 생기므로 리스너도 매번 새로 붙임
+    map.on('click', function (evt) {
+      const feature = map.forEachFeatureAtPixel(evt.pixel, function (f) { return f; }, {
+        layerFilter: function (l) { return l === layer; }
+      });
+      const addr = feature && feature.get('addr');
+      if (addr) {
+        const input = document.querySelector('.addrInputRow');
+        const btn = document.getElementById('addrSearchBtn');
+        if (input && btn) { input.value = addr; btn.click(); }
+      }
+    });
+    map.on('pointermove', function (evt) {
+      const hit = map.hasFeatureAtPixel(evt.pixel, { layerFilter: function (l) { return l === layer; } });
+      // vw.ol3.Map(OL3 래퍼)에 getTargetElement가 없을 수 있어 getTarget()도 폴백으로 시도
+      let target = map.getTargetElement ? map.getTargetElement() : null;
+      if (!target) {
+        const t = map.getTarget && map.getTarget();
+        target = typeof t === 'string' ? document.getElementById(t) : (t || document.getElementById('vmapMain'));
+      }
+      if (target) target.style.cursor = hit ? 'pointer' : '';
+    });
   } catch (e) {
     showDebug('주변 지번 그리기 실패', e.message);
   }
