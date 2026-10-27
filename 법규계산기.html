@@ -6219,6 +6219,10 @@ addrSearchBtn.addEventListener('click', async () => {
     // 기존 건축물 층별개요는 조회가 느려서(3초+) 별도로 분리했으므로, 여기선 빈 슬롯만 만들어두고
     // 아래에서 floorInfoPromise가 도착하면 채워넣음 — 나머지 정보는 기다리지 않고 먼저 보여줌
     html += '<div id="floorInfoSlot"></div>';
+    // 이 대지에 도면 그리기 — 말로 캐드(/cad/)로 대지 정보를 넘김(2026-10-26 추가, 기존 계산 로직은 건드리지 않음)
+    html += '<div style="margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">' +
+      '<button type="button" class="calc-btn" id="drawCadBtn" style="margin-top:0; padding:0 16px; height:40px;">이 대지에 도면 그리기</button>' +
+      '<span id="drawCadMsg" style="font-size:12.5px; color:var(--text-muted);"></span></div>';
     html += '</div>';
     html += '</div>';
 
@@ -6250,6 +6254,9 @@ addrSearchBtn.addEventListener('click', async () => {
 
     addrResultBox.style.display = 'block';
     addrResultBox.innerHTML = html;
+    lastLookupForCad = { okResults, totalArea, missingAreaCount, zoneConsistent, addrs };
+    const drawCadBtnEl = document.getElementById('drawCadBtn');
+    if (drawCadBtnEl) drawCadBtnEl.addEventListener('click', openCadWithHandoff);
     // 층별개요(건축HUB API)는 조회가 유독 느려서(실측 3초+) 나머지 결과와 분리해 별도로 기다림 —
     // 도착하면 그때 #floorInfoSlot을 채움. 이 사이 다른 검색이 또 실행돼서 addrResultBox가 통째로
     // 바뀌었을 수 있으니, slot이 그때도 여전히 DOM에 붙어있는지 확인 후 채움(안 붙어있으면 조용히 무시)
@@ -6372,6 +6379,56 @@ function lookupZoneRates(sido, sigg, uname){
                   : CITY_SPECIFIC[sigg] ? CITY_SPECIFIC[sigg]
                   : null;
   return (cityData && cityData[uname]) ? { coverage: cityData[uname].coverage, floor: cityData[uname].floor } : null;
+}
+
+// ---------- 말로 캐드(/cad/)로 대지 정보 넘기기 ----------
+// 같은 도메인(github.io)이라 localStorage('pb.handoff')로 서버 없이 전달. 값을 모르면 null — 추정해서 채우지 않음.
+// 필지가 여러 개면 경계 합치기 방식을 아직 정하지 않았으므로 boundary는 null로 두고 parcels에 필지별로 전달
+// (캐드 쪽에서 "다중 필지 미지원"으로 표시). 사안별로 정리하기로 한 사항(2026-10-26).
+let lastLookupForCad = null;
+function buildCadHandoff() {
+  const L = lastLookupForCad;
+  if (!L || !L.okResults || !L.okResults.length) return null;
+  const first = L.okResults[0];
+  const multi = L.okResults.length > 1;
+  let coverage = null, floor = null;
+  if (multi && !L.zoneConsistent && multiZoneWeighted) {
+    coverage = multiZoneWeighted.coverage; floor = multiZoneWeighted.floor;
+  } else {
+    const rate = lookupZoneRates(first.sido, first.sigg, first.uname);
+    if (rate) { coverage = rate.coverage; floor = rate.floor; }
+  }
+  const rfw = parseFloat(document.getElementById('roadFrontageWidth').value);
+  return {
+    v: 1,
+    createdAt: new Date().toISOString(),
+    addr: first.addr, addrs: L.addrs,
+    pnu: first.pnu, sido: first.sido, sigg: first.sigg,
+    uname: L.zoneConsistent ? first.uname : null,
+    jimok: first.jimok || null,
+    area: L.missingAreaCount > 0 ? null : L.totalArea,
+    coverage, floor,
+    multiParcel: multi,
+    boundary: multi ? null : (first.boundary || null),
+    parcels: L.okResults.map(r => ({ addr: r.addr, pnu: r.pnu, uname: r.uname, jimok: r.jimok || null, area: r.area, boundary: r.boundary || null })),
+    narrowestRoad: multi ? null : (lastNarrowestRoad || null),
+    roadFrontageWidth: (rfw > 0) ? rfw : null,
+    sunlightRule: lastSunlightRule || null,
+    overlayRisks: (lastOverlayRisks && lastOverlayRisks.risks) ? lastOverlayRisks.risks.map(r => ({ label: r.label, raw: r.raw || null, authority: r.authority || null, blocking: !!r.blocking })) : []
+  };
+}
+function openCadWithHandoff() {
+  const msgEl = document.getElementById('drawCadMsg');
+  const data = buildCadHandoff();
+  if (!data) { if (msgEl) msgEl.textContent = '먼저 주소를 조회해주세요.'; return; }
+  try {
+    localStorage.setItem('pb.handoff', JSON.stringify(data));
+  } catch (e) {
+    if (msgEl) msgEl.textContent = '브라우저 저장소를 쓸 수 없어 캐드로 넘기지 못했습니다: ' + e.message;
+    return;
+  }
+  if (msgEl) msgEl.textContent = data.multiParcel ? '여러 필지는 캐드에서 아직 지원하지 않아 필지 정보만 넘겼습니다.' : '';
+  window.open('/cad/', '_blank'); // 말로 캐드는 별도 저장소(cad) — 같은 도메인 changho105-dotcom.github.io/cad/
 }
 
 // alert() 대신 사용하는 인라인 입력 경고
